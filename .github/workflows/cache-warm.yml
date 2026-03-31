@@ -1,0 +1,33 @@
+name: Warm Rust Cache
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  warm-cache:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: tauri-build
+          save-if: true
+
+      - name: Build Rust dependencies only
+        working-directory: src-tauri
+        run: cargo check
