@@ -2,6 +2,7 @@ import type { GanttNode, GanttRow, ZoomLevel, ZoomConfig } from '$lib/types';
 import { ZOOM_CONFIGS } from '$lib/types';
 import { projectStore } from '../project/index.js';
 import { persistenceStore } from '../persistence/index.js';
+import { historyStore } from '../history/index.js';
 import type { RecentEntry } from '../persistence/index.js';
 import {
   flattenNodes,
@@ -12,6 +13,8 @@ import {
   findAncestor,
   computeRowContexts,
   computeDependencyPairs,
+  computeProgress,
+  computeCriticalPath,
 } from './helpers.js';
 import type { BreadcrumbEntry, RowContext, DependencyPair, ResolvedDependency } from './models.js';
 
@@ -108,8 +111,36 @@ class GanttStore {
   // --- Derived: dependency pairs (from gantt-timeline.svelte) ---
   dependencyPairs = $derived<DependencyPair[]>(computeDependencyPairs(this.rows));
 
+  // --- Derived: critical path ---
+  criticalPath = $derived<Set<string>>(computeCriticalPath(projectStore.project.children));
+
   // --- Derived: has tasks ---
   hasTasks = $derived(this.rows.length > 0);
+
+  // --- Derived: parent progress ---
+  /**
+   * Map of node id → auto-calculated progress for parent nodes.
+   * Leaf nodes keep their manual progress; parents aggregate from children.
+   * Components should read from this for display rather than node.progress for parents.
+   */
+  parentProgress = $derived.by<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    const walk = (nodes: GanttNode[]) => {
+      for (const node of nodes) {
+        if (node.children.length > 0) {
+          map.set(node.id, computeProgress(node));
+        }
+        walk(node.children);
+      }
+    };
+    walk(projectStore.project.children);
+    return map;
+  });
+
+  /** Get the effective progress for any node (auto-calculated for parents, manual for leaves). */
+  getEffectiveProgress(id: string): number {
+    return this.parentProgress.get(id) ?? (this.getNodeById(id)?.progress ?? 0);
+  }
 
   // --- Methods: task tree ---
   toggleExpand(id: string): void {
@@ -240,6 +271,7 @@ class GanttStore {
     const project = await persistenceStore.openFolder();
     if (project) {
       projectStore.loadProject(project);
+      historyStore.clear();
       this.focusPath = [];
       this.selectedTaskId = null;
       this.hoveredTaskId = null;
@@ -250,6 +282,7 @@ class GanttStore {
     const project = await persistenceStore.openRecent(entry);
     if (project) {
       projectStore.loadProject(project);
+      historyStore.clear();
       this.focusPath = [];
       this.selectedTaskId = null;
       this.hoveredTaskId = null;
@@ -260,6 +293,7 @@ class GanttStore {
     const project = await persistenceStore.createInFolder();
     if (project) {
       projectStore.loadProject(project);
+      historyStore.clear();
       this.focusPath = [];
       this.selectedTaskId = null;
       this.hoveredTaskId = null;
@@ -268,6 +302,14 @@ class GanttStore {
 
   // --- Methods: keyboard navigation (from gantt-chart.svelte) ---
   handleKeyDown(e: KeyboardEvent): void {
+    // Ctrl+Z / Ctrl+Shift+Z: undo / redo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) this.redo();
+      else this.undo();
+      return;
+    }
+
     // Ctrl+0: reset UI scale
     if ((e.ctrlKey || e.metaKey) && e.key === '0') {
       e.preventDefault();
@@ -328,8 +370,24 @@ class GanttStore {
     }
   }
 
+  // --- Methods: undo/redo ---
+  undo(): void {
+    historyStore.undo();
+    this._triggerSaveWithoutSnapshot();
+  }
+
+  redo(): void {
+    historyStore.redo();
+    this._triggerSaveWithoutSnapshot();
+  }
+
   // --- Private: auto-save ---
   private _triggerSave(): void {
+    historyStore.snapshot();
+    persistenceStore.scheduleSave(projectStore.project);
+  }
+
+  private _triggerSaveWithoutSnapshot(): void {
     persistenceStore.scheduleSave(projectStore.project);
   }
 }

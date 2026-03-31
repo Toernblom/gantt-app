@@ -15,6 +15,7 @@
 	import { ganttStore } from "$lib/stores/gantt/index.js";
 	import { dialogStore } from "$lib/stores/dialog/index.js";
 	import { persistenceStore } from "$lib/stores/persistence/index.js";
+	import { historyStore } from "$lib/stores/history/index.js";
 	import type { ZoomLevel } from "$lib/types.js";
 
 	// Mirror the store's zoom level in a local string so the toggle group stays in sync.
@@ -77,7 +78,10 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button variant="ghost" size="icon" class="size-8" {...props}>
+							<Button variant="ghost" size="icon" class="size-8"
+								disabled={!historyStore.canUndo}
+								onclick={() => ganttStore.undo()}
+								{...props}>
 								<ArrowBackUpIcon class="size-4" />
 								<span class="sr-only">Undo</span>
 							</Button>
@@ -91,7 +95,10 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button variant="ghost" size="icon" class="size-8" {...props}>
+							<Button variant="ghost" size="icon" class="size-8"
+								disabled={!historyStore.canRedo}
+								onclick={() => ganttStore.redo()}
+								{...props}>
 								<ArrowForwardUpIcon class="size-4" />
 								<span class="sr-only">Redo</span>
 							</Button>

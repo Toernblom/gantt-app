@@ -63,6 +63,7 @@
 
 	let isSelected = $derived(ganttStore.selectedTaskId === row.id);
 	let isHovered = $derived(ganttStore.hoveredTaskId === row.id);
+	let isOnCriticalPath = $derived(ganttStore.criticalPath.has(row.id));
 
 	let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -492,6 +493,22 @@
 				stroke="white"
 				stroke-width="1"
 				stroke-opacity="0.4"
+			/>
+		{/if}
+
+		<!-- Critical path outline -->
+		{#if isOnCriticalPath && !isSelected}
+			<rect
+				x={previewX - 1}
+				y={y - 1}
+				width={previewWidth + 2}
+				height={barHeight + 2}
+				rx="5"
+				fill="none"
+				stroke="#ef4444"
+				stroke-width="1.5"
+				stroke-opacity="0.6"
+				pointer-events="none"
 			/>
 		{/if}
 

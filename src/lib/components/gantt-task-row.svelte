@@ -29,6 +29,7 @@
 
 	let isSelected = $derived(ganttStore.selectedTaskId === row.id);
 	let isHovered = $derived(ganttStore.hoveredTaskId === row.id);
+	let isOnCriticalPath = $derived(ganttStore.criticalPath.has(row.id));
 
 	let collapsedChildCount = $derived.by(() => {
 		if (row.expanded || !row.hasChildren) return 0;
@@ -90,6 +91,11 @@
 				onmouseenter={handleMouseEnter}
 				onmouseleave={handleMouseLeave}
 			>
+				<!-- Critical path left-border indicator -->
+				{#if isOnCriticalPath}
+					<span class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-red-500/60"></span>
+				{/if}
+
 				<!-- ========== Tree indent guides ========== -->
 				<!-- Vertical lines for each ancestor level that has more siblings below -->
 				{#each guides as continues, lvl}

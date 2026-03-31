@@ -112,6 +112,94 @@ export function computeRowContexts(rows: GanttRow[]): { guides: boolean[]; isLas
 }
 
 /**
+ * Recursively compute progress for parent nodes from their children.
+ * Weighted average by duration (in days). Leaf nodes keep their manual progress.
+ * Returns the computed progress for the given node.
+ */
+export function computeProgress(node: GanttNode): number {
+  if (node.children.length === 0) return node.progress;
+
+  let totalWeight = 0;
+  let weightedSum = 0;
+  for (const child of node.children) {
+    const childProgress = computeProgress(child);
+    const start = new Date(child.startDate).getTime();
+    const end = new Date(child.endDate).getTime();
+    const days = Math.max(1, Math.round((end - start) / 86_400_000) + 1);
+    weightedSum += childProgress * days;
+    totalWeight += days;
+  }
+  return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+}
+
+/**
+ * Compute the critical path: the longest chain of FS-dependent tasks
+ * that determines the project's minimum duration.
+ * Returns a Set of task IDs on the critical path.
+ */
+export function computeCriticalPath(nodes: GanttNode[]): Set<string> {
+  // Collect all nodes recursively
+  const allNodes: GanttNode[] = [];
+  const collect = (list: GanttNode[]) => {
+    for (const n of list) {
+      allNodes.push(n);
+      collect(n.children);
+    }
+  };
+  collect(nodes);
+
+  const nodeMap = new Map(allNodes.map(n => [n.id, n]));
+
+  // For each node, compute the longest path FROM it to the end of the project.
+  // Use memoized DFS. "Length" = sum of durations along the chain.
+  const memo = new Map<string, { length: number; path: string[] }>();
+
+  function longestFrom(id: string): { length: number; path: string[] } {
+    if (memo.has(id)) return memo.get(id)!;
+    const node = nodeMap.get(id);
+    if (!node) { memo.set(id, { length: 0, path: [] }); return memo.get(id)!; }
+
+    const start = new Date(node.startDate).getTime();
+    const end = new Date(node.endDate).getTime();
+    const duration = Math.max(1, Math.round((end - start) / 86_400_000) + 1);
+
+    // Find all tasks that depend on this one (this node is their prerequisite)
+    const dependents = allNodes.filter(n =>
+      n.dependencies.some(d => d.targetId === id && d.type === 'FS')
+    );
+
+    if (dependents.length === 0) {
+      const result = { length: duration, path: [id] };
+      memo.set(id, result);
+      return result;
+    }
+
+    let best = { length: 0, path: [] as string[] };
+    for (const dep of dependents) {
+      const sub = longestFrom(dep.id);
+      if (sub.length > best.length) best = sub;
+    }
+
+    const result = { length: duration + best.length, path: [id, ...best.path] };
+    memo.set(id, result);
+    return result;
+  }
+
+  // Find the global longest path starting from any node
+  let globalBest = { length: 0, path: [] as string[] };
+  for (const node of allNodes) {
+    // Only start from nodes with no FS prerequisites (entry points)
+    const hasPrereqs = node.dependencies.some(d => d.type === 'FS');
+    if (!hasPrereqs) {
+      const result = longestFrom(node.id);
+      if (result.length > globalBest.length) globalBest = result;
+    }
+  }
+
+  return new Set(globalBest.path);
+}
+
+/**
  * Build dependency pairs from flattened rows.
  * Each row's dependencies list prerequisites (targetId = prerequisite).
  * Returns pairs going FROM prerequisite TO dependent.

@@ -23,6 +23,11 @@
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 
+	import * as Popover from "$lib/components/ui/popover/index.js";
+	import * as Calendar from "$lib/components/ui/calendar/index.js";
+	import { parseDate } from "@internationalized/date";
+	import type { DateValue } from "@internationalized/date";
+
 	import { ganttStore } from "$lib/stores/gantt/index.js";
 	import { formatDisplayDate } from "$lib/utils/timeline";
 
@@ -42,7 +47,10 @@
 	let selectedColor = $derived(ganttStore.selectedColor);
 
 	let taskName = $derived(selectedTask?.name ?? "");
-	let progressValue = $derived(selectedTask?.progress ?? 0);
+	let isParent = $derived((selectedTask?.children?.length ?? 0) > 0);
+	let progressValue = $derived(
+		selectedTask ? ganttStore.getEffectiveProgress(selectedTask.id) : 0
+	);
 	let isMilestone = $derived(selectedTask?.isMilestone ?? false);
 	let duration = $derived(ganttStore.duration);
 	let resolvedDependencies = $derived(ganttStore.resolvedDependencies);
@@ -106,6 +114,20 @@
 
 	function handleClose() {
 		ganttStore.selectTask(null);
+	}
+
+	function handleStartDateChange(value: DateValue | undefined) {
+		if (!selectedTaskId || !value) return;
+		ganttStore.updateTask(selectedTaskId, { startDate: value.toString() });
+	}
+
+	function handleEndDateChange(value: DateValue | undefined) {
+		if (!selectedTaskId || !value) return;
+		ganttStore.updateTask(selectedTaskId, { endDate: value.toString() });
+	}
+
+	function isoToDateValue(iso: string): DateValue | undefined {
+		try { return parseDate(iso); } catch { return undefined; }
 	}
 </script>
 
@@ -187,17 +209,43 @@
 							<Card.Content class="grid grid-cols-2 gap-3">
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">Start Date</Label>
-									<Button variant="outline" size="sm" class="w-full justify-start text-xs">
-										<CalendarIcon class="mr-2 size-3" />
-										{selectedTask ? formatDisplayDate(selectedTask.startDate) : "—"}
-									</Button>
+									<Popover.Root>
+										<Popover.Trigger>
+											{#snippet child({ props })}
+												<Button variant="outline" size="sm" class="w-full justify-start text-xs" {...props}>
+													<CalendarIcon class="mr-2 size-3" />
+													{selectedTask ? formatDisplayDate(selectedTask.startDate) : "—"}
+												</Button>
+											{/snippet}
+										</Popover.Trigger>
+										<Popover.Content class="w-auto p-0" align="start">
+											<Calendar.Calendar
+												type="single"
+												value={selectedTask ? isoToDateValue(selectedTask.startDate) : undefined}
+												onValueChange={handleStartDateChange}
+											/>
+										</Popover.Content>
+									</Popover.Root>
 								</div>
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">End Date</Label>
-									<Button variant="outline" size="sm" class="w-full justify-start text-xs">
-										<CalendarIcon class="mr-2 size-3" />
-										{selectedTask ? formatDisplayDate(selectedTask.endDate) : "—"}
-									</Button>
+									<Popover.Root>
+										<Popover.Trigger>
+											{#snippet child({ props })}
+												<Button variant="outline" size="sm" class="w-full justify-start text-xs" {...props}>
+													<CalendarIcon class="mr-2 size-3" />
+													{selectedTask ? formatDisplayDate(selectedTask.endDate) : "—"}
+												</Button>
+											{/snippet}
+										</Popover.Trigger>
+										<Popover.Content class="w-auto p-0" align="start">
+											<Calendar.Calendar
+												type="single"
+												value={selectedTask ? isoToDateValue(selectedTask.endDate) : undefined}
+												onValueChange={handleEndDateChange}
+											/>
+										</Popover.Content>
+									</Popover.Root>
 								</div>
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">Duration</Label>
@@ -232,9 +280,13 @@
 										min={0}
 										max={100}
 										step={1}
+										disabled={isParent}
 										class="flex-1"
 									/>
 									<span class="w-10 text-right text-sm tabular-nums">{progressValue}%</span>
+									{#if isParent}
+										<span class="text-xs text-muted-foreground">(auto)</span>
+									{/if}
 								</div>
 								<Progress value={progressValue} class="h-2" />
 							</Card.Content>
