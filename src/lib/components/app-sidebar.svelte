@@ -3,8 +3,8 @@
 	import FolderOpenIcon from "@tabler/icons-svelte/icons/folder-open";
 	import GanttChartIcon from "@tabler/icons-svelte/icons/chart-bar";
 	import ListIcon from "@tabler/icons-svelte/icons/list";
-	import SettingsIcon from "@tabler/icons-svelte/icons/settings";
 	import DownloadIcon from "@tabler/icons-svelte/icons/download";
+	import RefreshIcon from "@tabler/icons-svelte/icons/refresh";
 	import FolderIcon from "@tabler/icons-svelte/icons/folder";
 	import TrashIcon from "@tabler/icons-svelte/icons/trash";
 
@@ -165,9 +165,18 @@
 				<ModeToggle />
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton tooltipContent="Settings">
-					<SettingsIcon />
-					<span>Settings</span>
+				<Sidebar.MenuButton
+					tooltipContent="Check for updates"
+					onclick={() => updaterStore.check()}
+				>
+					<RefreshIcon class={updaterStore.checking ? 'animate-spin' : ''} />
+					<span>
+						{#if updaterStore.checking}
+							Checking...
+						{:else}
+							Check for Updates
+						{/if}
+					</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
