@@ -31,6 +31,30 @@
 	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { formatDisplayDate } from "$lib/utils/timeline";
 
+	let editingTodoId = $state<string | null>(null);
+
+	// Clear editing when a different task is selected
+	$effect(() => {
+		ganttStore.selectedTaskId;
+		editingTodoId = null;
+	});
+
+	function focusAndSelect(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+
+	function startEditTodo(todoId: string) {
+		editingTodoId = todoId;
+	}
+
+	function commitEditTodo(taskId: string, todoId: string, e: Event) {
+		const input = e.target as HTMLInputElement;
+		const text = input.value.trim();
+		if (text) ganttStore.updateTodoText(taskId, todoId, text);
+		editingTodoId = null;
+	}
+
 	// ---------------------------------------------------------------------------
 	// Constants
 	// ---------------------------------------------------------------------------
@@ -385,14 +409,29 @@
 											onCheckedChange={() => ganttStore.toggleTodo(entry.taskId, entry.todo.id)}
 										/>
 										<div class="flex min-w-0 flex-1 flex-col">
-											<label
-												for={entry.todo.id}
-												class="cursor-pointer text-sm"
-												class:line-through={entry.todo.done}
-												class:text-muted-foreground={entry.todo.done}
-											>
-												{entry.todo.text}
-											</label>
+											{#if editingTodoId === entry.todo.id}
+												<input
+													type="text"
+													value={entry.todo.text}
+													use:focusAndSelect
+													class="rounded bg-muted px-1.5 py-0.5 text-sm outline-none ring-1 ring-primary"
+													onblur={(e) => commitEditTodo(entry.taskId, entry.todo.id, e)}
+													onkeydown={(e) => {
+														if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+														if (e.key === 'Escape') { editingTodoId = null; }
+													}}
+												/>
+											{:else}
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<span
+													class="cursor-text text-sm"
+													class:line-through={entry.todo.done}
+													class:text-muted-foreground={entry.todo.done}
+													ondblclick={() => startEditTodo(entry.todo.id)}
+												>
+													{entry.todo.text}
+												</span>
+											{/if}
 											<span class="text-[10px] text-muted-foreground">{entry.taskName}</span>
 										</div>
 										<Button
@@ -418,14 +457,29 @@
 											checked={todo.done}
 											onCheckedChange={() => ganttStore.toggleTodo(ganttStore.selectedTaskId!, todo.id)}
 										/>
-										<label
-											for={todo.id}
-											class="flex-1 cursor-pointer text-sm"
-											class:line-through={todo.done}
-											class:text-muted-foreground={todo.done}
-										>
-											{todo.text}
-										</label>
+										{#if editingTodoId === todo.id}
+											<input
+												type="text"
+												value={todo.text}
+												use:focusAndSelect
+												class="flex-1 rounded bg-muted px-1.5 py-0.5 text-sm outline-none ring-1 ring-primary"
+												onblur={(e) => commitEditTodo(ganttStore.selectedTaskId!, todo.id, e)}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+													if (e.key === 'Escape') { editingTodoId = null; }
+												}}
+											/>
+										{:else}
+											<!-- svelte-ignore a11y_no_static_element_interactions -->
+											<span
+												class="flex-1 cursor-text text-sm"
+												class:line-through={todo.done}
+												class:text-muted-foreground={todo.done}
+												ondblclick={() => startEditTodo(todo.id)}
+											>
+												{todo.text}
+											</span>
+										{/if}
 										<Button
 											variant="ghost"
 											size="icon"

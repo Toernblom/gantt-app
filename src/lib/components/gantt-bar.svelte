@@ -62,6 +62,7 @@
 	// -------------------------------------------------------------------------
 
 	let isSelected = $derived(ganttStore.selectedTaskId === row.id);
+	let isMultiSelected = $derived(ganttStore.isMultiSelected(row.id));
 	let isHovered = $derived(ganttStore.hoveredTaskId === row.id);
 	let isOnCriticalPath = $derived(ganttStore.criticalPath.has(row.id));
 
@@ -242,9 +243,16 @@
 		window.addEventListener('mouseup', onHoldUp);
 	}
 
+	let isMultiDrag = $derived(isDragging && isMultiSelected && ganttStore.selectedTaskIds.size > 1);
+
 	function handleDragMove(e: MouseEvent) {
 		if (!isDragging) return;
 		dragOffsetX = clientXToSvgX(e.clientX, e.clientY) - dragStartSvgX;
+		// Broadcast offset so timeline renders ghosts for all selected bars
+		if (isMultiSelected && ganttStore.selectedTaskIds.size > 1) {
+			ganttStore.multiDragOffsetPx = dragOffsetX;
+			ganttStore.multiDragSourceId = row.id;
+		}
 	}
 
 	function handleDragEnd() {
@@ -256,11 +264,20 @@
 
 		const target = snapPreview;
 		if (target) {
-			ganttStore.updateTask(row.id, { startDate: target.startIso, endDate: target.endIso });
+			const deltaMs = new Date(target.startIso).getTime() - new Date(dragOriginalStart).getTime();
+			if (isMultiSelected && ganttStore.selectedTaskIds.size > 1) {
+				ganttStore.moveSelectedTasks(deltaMs);
+			} else if (row.hasChildren) {
+				ganttStore.moveTaskTree(row.id, target.startIso, target.endIso);
+			} else {
+				ganttStore.updateTask(row.id, { startDate: target.startIso, endDate: target.endIso });
+			}
 		}
 
 		isDragging = false;
 		dragOffsetX = 0;
+		ganttStore.multiDragOffsetPx = 0;
+		ganttStore.multiDragSourceId = null;
 	}
 
 	// -------------------------------------------------------------------------
@@ -315,12 +332,19 @@
 		interactionStore.handleBarMouseUp(row.id);
 	}
 
-	function handleClick() {
+	let lastClickCtrl = false;
+
+	function handleClick(e: MouseEvent) {
 		if (isDragging || isResizing) return;
 		if (interactionStore.isLinking) return;
 		if (clickTimer) return;
+		lastClickCtrl = e.ctrlKey || e.metaKey;
 		clickTimer = setTimeout(() => {
-			ganttStore.selectTask(row.id);
+			if (lastClickCtrl) {
+				ganttStore.toggleMultiSelect(row.id);
+			} else {
+				ganttStore.selectTask(row.id);
+			}
 			clickTimer = null;
 		}, 200);
 	}
@@ -349,6 +373,19 @@
 		interactionStore.isLinking ? 'crosshair' : isDragging ? 'grabbing' : 'grab'
 	);
 
+	// Is this bar being passively moved by another bar's multi-drag?
+	let isPassiveMultiDrag = $derived(
+		!isDragging && isMultiSelected && ganttStore.multiDragSourceId !== null && ganttStore.multiDragSourceId !== row.id
+	);
+
+	let translatePx = $derived(
+		isDragging ? dragOffsetX : isPassiveMultiDrag ? ganttStore.multiDragOffsetPx : 0
+	);
+
+	let barOpacity = $derived(
+		isDragging || isPassiveMultiDrag ? 0.7 : isHovered ? 1 : 0.95
+	);
+
 	// -------------------------------------------------------------------------
 	// Tooltip text
 	// -------------------------------------------------------------------------
@@ -364,6 +401,24 @@
 		x={snapPreview.x}
 		{y}
 		width={snapPreview.width}
+		height={barHeight}
+		rx="4"
+		fill={row.color}
+		fill-opacity="0.2"
+		stroke={row.color}
+		stroke-width="1.5"
+		stroke-opacity="0.5"
+		stroke-dasharray="4,3"
+		pointer-events="none"
+	/>
+{/if}
+
+<!-- Ghost for passive multi-drag (this bar follows another bar's drag) -->
+{#if isPassiveMultiDrag && Math.abs(ganttStore.multiDragOffsetPx) >= 3}
+	<rect
+		x={x + ganttStore.multiDragOffsetPx}
+		{y}
+		width={barWidth}
 		height={barHeight}
 		rx="4"
 		fill={row.color}
@@ -410,8 +465,8 @@
 	onmouseup={handleMouseUp}
 	onmouseenter={handleMouseEnter}
 	onmouseleave={handleMouseLeave}
-	style="cursor: {gCursor}; {isDragging ? `transform: translate(${dragOffsetX}px, 0)` : ''}"
-	opacity={isDragging ? 0.7 : isHovered ? 1 : 0.95}
+	style="cursor: {gCursor}; {translatePx ? `transform: translate(${translatePx}px, 0)` : ''}"
+	opacity={barOpacity}
 >
 	<title>{tooltipText}</title>
 
@@ -459,7 +514,7 @@
 		/>
 
 		<!-- Selection ring on summary stripe area -->
-		{#if isSelected}
+		{#if isSelected || isMultiSelected}
 			<rect
 				x={x - 1}
 				y={epicY - 1}
@@ -467,7 +522,7 @@
 				height={epicHeight + 2}
 				rx="3"
 				fill="none"
-				stroke="white"
+				stroke={isMultiSelected ? '#3b82f6' : 'white'}
 				stroke-width="1.5"
 				stroke-opacity="0.8"
 			/>
@@ -519,7 +574,7 @@
 		{/if}
 
 		<!-- Selection ring -->
-		{#if isSelected}
+		{#if isSelected || isMultiSelected}
 			<rect
 				x={previewX - 1}
 				y={y - 1}
@@ -528,14 +583,14 @@
 				rx="5"
 				ry="5"
 				fill="none"
-				stroke="white"
-				stroke-width="2"
+				stroke={isMultiSelected ? '#3b82f6' : 'white'}
+				stroke-width={isMultiSelected && !isSelected ? 1.5 : 2}
 				stroke-opacity="0.85"
 			/>
 		{/if}
 
 		<!-- Hover glow ring (distinct from selection ring) -->
-		{#if isHovered && !isSelected}
+		{#if isHovered && !isSelected && !isMultiSelected}
 			<rect
 				x={previewX - 1}
 				y={y - 1}

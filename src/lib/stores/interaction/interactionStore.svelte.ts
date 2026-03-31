@@ -23,6 +23,13 @@ class InteractionStore {
   /** Selected dependency: { taskId, targetId } — taskId is the dependent, targetId is the prereq. */
   selectedDep = $state<{ taskId: string; targetId: string } | null>(null);
 
+  // --- Box-select state (visual only — hit-testing done in component) ---
+  isBoxSelecting = $state(false);
+  boxX1 = $state(0);
+  boxY1 = $state(0);
+  boxX2 = $state(0);
+  boxY2 = $state(0);
+
   // --- SVG coordinate helper ---
   private _svgEl: SVGSVGElement | null = null;
   private _svgPoint: DOMPoint | null = null;

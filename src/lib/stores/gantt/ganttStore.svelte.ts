@@ -25,7 +25,11 @@ class GanttStore {
   focusPath = $state<string[]>([]);
   zoomLevel = $state<ZoomLevel>('week');
   selectedTaskId = $state<string | null>(null);
+  selectedTaskIds = $state<Set<string>>(new Set());
   hoveredTaskId = $state<string | null>(null);
+  /** Pixel offset shared during multi-drag so timeline can render ghosts for all selected bars. */
+  multiDragOffsetPx = $state(0);
+  multiDragSourceId = $state<string | null>(null);
   viewMode = $state<'gantt' | 'kanban'>(
     (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('gantt-viewMode') as 'gantt' | 'kanban') || 'gantt'
   );
@@ -164,11 +168,74 @@ class GanttStore {
 
   selectTask(id: string | null): void {
     if (id) {
-      // Expand all ancestors so the task is visible in the row list
       this._expandAncestors(id);
       interactionStore.clearDependencySelection();
     }
     this.selectedTaskId = id;
+    this.selectedTaskIds = new Set();
+  }
+
+  /** Ctrl+click: toggle a task in/out of multi-selection. */
+  toggleMultiSelect(id: string): void {
+    const next = new Set(this.selectedTaskIds);
+    // If nothing multi-selected yet, seed with the current single selection
+    if (next.size === 0 && this.selectedTaskId) {
+      next.add(this.selectedTaskId);
+    }
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    this.selectedTaskIds = next;
+    // Keep detail pane focused on the toggled task
+    this.selectedTaskId = id;
+    interactionStore.clearDependencySelection();
+  }
+
+  /** Box-select: replace multi-selection with a set of IDs. */
+  setMultiSelection(ids: string[]): void {
+    this.selectedTaskIds = new Set(ids);
+    if (ids.length > 0) {
+      this.selectedTaskId = ids[0];
+    }
+  }
+
+  /** Check if a task is part of the multi-selection. */
+  isMultiSelected(id: string): boolean {
+    return this.selectedTaskIds.size > 0 && this.selectedTaskIds.has(id);
+  }
+
+  /** Shift all multi-selected tasks (and their subtrees) by the same delta. */
+  moveSelectedTasks(deltaMs: number): void {
+    if (deltaMs === 0 || this.selectedTaskIds.size === 0) return;
+    historyStore.snapshot();
+    for (const id of this.selectedTaskIds) {
+      const node = findNodeById(projectStore.project.children, id);
+      if (!node) continue;
+      // Skip if an ancestor is also selected (it will move this node already)
+      if (this._hasSelectedAncestor(id)) continue;
+      const shift = (n: GanttNode) => {
+        n.startDate = _shiftIso(n.startDate, deltaMs);
+        n.endDate = _shiftIso(n.endDate, deltaMs);
+        for (const child of n.children) shift(child);
+      };
+      shift(node);
+    }
+    this._triggerSaveWithoutSnapshot();
+  }
+
+  private _hasSelectedAncestor(id: string): boolean {
+    const path: GanttNode[] = [];
+    const find = (nodes: GanttNode[], trail: GanttNode[]): boolean => {
+      for (const node of nodes) {
+        if (node.id === id) { path.push(...trail); return true; }
+        if (node.children.length > 0 && find(node.children, [...trail, node])) return true;
+      }
+      return false;
+    };
+    find(projectStore.project.children, []);
+    return path.some(ancestor => this.selectedTaskIds.has(ancestor.id));
   }
 
   /** Walk the tree to find the path to a node, and expand every ancestor along the way. */
@@ -200,6 +267,23 @@ class GanttStore {
     const node = findNodeById(projectStore.project.children, id);
     if (node) Object.assign(node, updates);
     this._triggerSave();
+  }
+
+  /** Shift a task and all its descendants by a day offset. */
+  moveTaskTree(id: string, newStart: string, newEnd: string): void {
+    const node = findNodeById(projectStore.project.children, id);
+    if (!node) return;
+    const deltaMs = new Date(newStart).getTime() - new Date(node.startDate).getTime();
+    if (deltaMs === 0) return;
+    // Snapshot BEFORE mutation so undo restores the original positions
+    historyStore.snapshot();
+    const shift = (n: GanttNode) => {
+      n.startDate = _shiftIso(n.startDate, deltaMs);
+      n.endDate = _shiftIso(n.endDate, deltaMs);
+      for (const child of n.children) shift(child);
+    };
+    shift(node);
+    this._triggerSaveWithoutSnapshot();
   }
 
   deleteTask(id: string): void {
@@ -324,6 +408,7 @@ class GanttStore {
       historyStore.clear();
       this.focusPath = [];
       this.selectedTaskId = null;
+      this.selectedTaskIds = new Set();
       this.hoveredTaskId = null;
     }
   }
@@ -395,7 +480,11 @@ class GanttStore {
       }
       case 'Escape': {
         e.preventDefault();
-        this.selectTask(null);
+        if (this.selectedTaskIds.size > 0) {
+          this.selectedTaskIds = new Set();
+        } else {
+          this.selectTask(null);
+        }
         break;
       }
       case 'Delete':
@@ -432,6 +521,15 @@ class GanttStore {
   private _triggerSaveWithoutSnapshot(): void {
     persistenceStore.scheduleSave(projectStore.project);
   }
+}
+
+/** Shift an ISO date string (YYYY-MM-DD) by a millisecond delta. */
+function _shiftIso(iso: string, deltaMs: number): string {
+  const d = new Date(new Date(iso).getTime() + deltaMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export const ganttStore = new GanttStore();

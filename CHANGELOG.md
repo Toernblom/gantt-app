@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.12
+
+- Multi-select: Ctrl+click to toggle tasks, or drag-select on empty timeline space to box-select
+- Multi-drag: drag any selected bar to move all selected tasks together with ghost previews
+- Dragging a collapsed epic now moves all subtasks with it
+- Double-click todo text to edit inline (Enter to save, Escape to cancel)
+- Fixed undo for tree moves (snapshot now captured before mutation)
+
 ## 0.1.11
 
 - Fixed task selection not working in Tauri builds (circular chunk dependencies broke store initialization)
