@@ -2,19 +2,28 @@
 	import ArrowBackUpIcon from "@tabler/icons-svelte/icons/arrow-back-up";
 	import ArrowForwardUpIcon from "@tabler/icons-svelte/icons/arrow-forward-up";
 	import FileExportIcon from "@tabler/icons-svelte/icons/file-export";
-	import CalendarIcon from "@tabler/icons-svelte/icons/calendar";
-	import GanttChartIcon from "@tabler/icons-svelte/icons/chart-bar";
-
+	import PlusIcon from "@tabler/icons-svelte/icons/plus";
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-	import * as ContextMenu from "$lib/components/ui/context-menu/index.js";
-	import * as ScrollArea from "$lib/components/ui/scroll-area/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import GanttChart from "./gantt-chart.svelte";
+	import KanbanBoard from "./kanban-board.svelte";
+	import TaskCreateDialog from "./task-create-dialog.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
+	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { dialogStore } from "$lib/stores/dialog/index.js";
+	import { persistenceStore } from "$lib/stores/persistence/index.js";
+	import type { ZoomLevel } from "$lib/types.js";
 
-	let zoomLevel = $state("week");
+	// Mirror the store's zoom level in a local string so the toggle group stays in sync.
+	let zoomLevel = $derived(ganttStore.zoomLevel as string);
+
+	function onZoomChange(value: string) {
+		if (value) ganttStore.setZoom(value as ZoomLevel);
+	}
+
 </script>
 
 <div class="flex h-full flex-col">
@@ -26,15 +35,41 @@
 		<!-- Breadcrumb -->
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href="#">My Project</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>All Tasks</Breadcrumb.Page>
-				</Breadcrumb.Item>
+				{#each ganttStore.breadcrumbs as segment, i (segment.id ?? 'root')}
+					{#if i > 0}
+						<Breadcrumb.Separator />
+					{/if}
+					<Breadcrumb.Item>
+						{#if i < ganttStore.breadcrumbs.length - 1}
+							<Breadcrumb.Link
+								href="#"
+								onclick={(e) => { e.preventDefault(); ganttStore.navigateTo(segment.depth); }}
+							>
+								{segment.name}
+							</Breadcrumb.Link>
+						{:else}
+							<Breadcrumb.Page>{segment.name}</Breadcrumb.Page>
+						{/if}
+					</Breadcrumb.Item>
+				{/each}
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
+
+		{#if persistenceStore.activeDirHandle}
+			<span class="text-xs text-muted-foreground/60">
+				{#if persistenceStore.isSaving}
+					Saving...
+				{:else if persistenceStore.error}
+					<span class="text-destructive">{persistenceStore.error}</span>
+				{:else if persistenceStore.lastSaved}
+					Saved
+				{/if}
+			</span>
+		{/if}
+
+		{#if !persistenceStore.activeDirHandle}
+			<span class="text-xs text-muted-foreground/50">Demo Project</span>
+		{/if}
 
 		<div class="ml-auto flex items-center gap-2">
 			<!-- Undo/Redo -->
@@ -68,17 +103,19 @@
 				</Tooltip.Root>
 			</Tooltip.Provider>
 
-			<Separator orientation="vertical" class="h-4" />
+			{#if ganttStore.viewMode === 'gantt'}
+				<Separator orientation="vertical" class="h-4" />
 
-			<!-- Zoom ToggleGroup -->
-			<ToggleGroup.Root type="single" variant="outline" size="sm" bind:value={zoomLevel}>
-				<ToggleGroup.Item value="day">Day</ToggleGroup.Item>
-				<ToggleGroup.Item value="week">Week</ToggleGroup.Item>
-				<ToggleGroup.Item value="month">Month</ToggleGroup.Item>
-				<ToggleGroup.Item value="quarter">Qtr</ToggleGroup.Item>
-			</ToggleGroup.Root>
+				<!-- Zoom ToggleGroup -->
+				<ToggleGroup.Root type="single" variant="outline" size="sm" value={zoomLevel} onValueChange={onZoomChange}>
+					<ToggleGroup.Item value="day">Day</ToggleGroup.Item>
+					<ToggleGroup.Item value="week">Week</ToggleGroup.Item>
+					<ToggleGroup.Item value="month">Month</ToggleGroup.Item>
+					<ToggleGroup.Item value="quarter">Qtr</ToggleGroup.Item>
+				</ToggleGroup.Root>
 
-			<Separator orientation="vertical" class="h-4" />
+				<Separator orientation="vertical" class="h-4" />
+			{/if}
 
 			<!-- Export button -->
 			<Tooltip.Provider>
@@ -94,38 +131,25 @@
 					<Tooltip.Content>Export chart</Tooltip.Content>
 				</Tooltip.Root>
 			</Tooltip.Provider>
+
+			<Separator orientation="vertical" class="h-4" />
+
+			<!-- Add Task button -->
+			<Button size="sm" onclick={() => dialogStore.requestCreate(ganttStore.focusedNode?.id)}>
+				<PlusIcon class="mr-1 size-4" />
+				Add Task
+			</Button>
 		</div>
 	</div>
 
-	<!-- Main area with ContextMenu -->
+	<!-- Main area -->
 	<div class="flex-1 overflow-hidden">
-		<ContextMenu.Root>
-			<ContextMenu.Trigger class="block h-full">
-				<ScrollArea.Root class="h-full">
-					<div class="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground">
-						<GanttChartIcon class="size-12 opacity-20" />
-						<p class="text-sm">
-							Gantt chart — zoom: <strong class="text-foreground">{zoomLevel}</strong>
-						</p>
-						<p class="text-xs opacity-60">Right-click for options</p>
-					</div>
-				</ScrollArea.Root>
-			</ContextMenu.Trigger>
-			<ContextMenu.Content class="w-52">
-				<ContextMenu.Item>
-					<CalendarIcon class="mr-2 size-4" />
-					<span>Add Task Here</span>
-				</ContextMenu.Item>
-				<ContextMenu.Item>
-					<span class="mr-2">◆</span>
-					<span>Add Milestone</span>
-				</ContextMenu.Item>
-				<ContextMenu.Separator />
-				<ContextMenu.Item>Zoom to Fit</ContextMenu.Item>
-				<ContextMenu.Item>Show Critical Path</ContextMenu.Item>
-				<ContextMenu.Separator />
-				<ContextMenu.Item>Select All</ContextMenu.Item>
-			</ContextMenu.Content>
-		</ContextMenu.Root>
+		{#if ganttStore.viewMode === 'kanban'}
+			<KanbanBoard />
+		{:else}
+			<GanttChart />
+		{/if}
 	</div>
 </div>
+
+<TaskCreateDialog />

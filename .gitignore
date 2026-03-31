@@ -21,3 +21,11 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Playwright
+.playwright/
+.playwright-cli/
+
+# Sample project data
+sample/
+sample2test/

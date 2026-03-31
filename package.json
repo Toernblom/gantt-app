@@ -25,6 +25,7 @@
 		"@tanstack/table-core": "^8.21.3",
 		"@types/d3-scale": "^4.0.9",
 		"@types/d3-shape": "^3.1.8",
+		"@types/wicg-file-system-access": "^2023.10.7",
 		"bits-ui": "^2.16.4",
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",

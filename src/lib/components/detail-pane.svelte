@@ -8,8 +8,8 @@
 
 	import * as Tabs from "$lib/components/ui/tabs/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Select from "$lib/components/ui/select/index.js";
 	import * as ScrollArea from "$lib/components/ui/scroll-area/index.js";
+	import * as Select from "$lib/components/ui/select/index.js";
 	import * as Table from "$lib/components/ui/table/index.js";
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
@@ -20,40 +20,93 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Slider } from "$lib/components/ui/slider/index.js";
 	import { Progress } from "$lib/components/ui/progress/index.js";
-	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
+	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 
-	// Sample data
-	let hasSelection = $state(true);
-	let taskName = $state("Design system integration");
-	let progress = $state([60]);
-	let isMilestone = $state(false);
+	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { formatDisplayDate } from "$lib/utils/timeline";
 
-	const dependencies = [
-		{ id: "d1", from: "Project setup", type: "FS", lag: "0d" },
-		{ id: "d2", from: "Database schema", type: "SS", lag: "+1d" },
-	];
-
-	let subtask1Done = $state(true);
-	let subtask2Done = $state(false);
-	let subtask3Done = $state(false);
-
-	const subtasks = [
-		{ id: "s1", label: "Define color tokens", get done() { return subtask1Done; }, set done(v: boolean) { subtask1Done = v; } },
-		{ id: "s2", label: "Build component library", get done() { return subtask2Done; }, set done(v: boolean) { subtask2Done = v; } },
-		{ id: "s3", label: "Write documentation", get done() { return subtask3Done; }, set done(v: boolean) { subtask3Done = v; } },
-	];
-
-	const epicColors = [
-		{ value: "e1", label: "Foundation", color: "#3b82f6" },
-		{ value: "e2", label: "Core Features", color: "#10b981" },
-		{ value: "e3", label: "Polish & Launch", color: "#f59e0b" },
-	];
+	// ---------------------------------------------------------------------------
+	// Constants
+	// ---------------------------------------------------------------------------
 
 	const taskColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
-	let selectedColor = $state(taskColors[0]);
 
-	let selectedEpic = $state("e1");
+	// ---------------------------------------------------------------------------
+	// Store-derived read values
+	// ---------------------------------------------------------------------------
+
+	let hasSelection = $derived(ganttStore.selectedTaskId !== null);
+	let selectedTaskId = $derived(ganttStore.selectedTaskId);
+	let selectedTask = $derived(ganttStore.selectedTask);
+	let selectedColor = $derived(ganttStore.selectedColor);
+
+	let taskName = $derived(selectedTask?.name ?? "");
+	let progressValue = $derived(selectedTask?.progress ?? 0);
+	let isMilestone = $derived(selectedTask?.isMilestone ?? false);
+	let duration = $derived(ganttStore.duration);
+	let resolvedDependencies = $derived(ganttStore.resolvedDependencies);
+	let description = $derived(selectedTask?.description ?? "");
+	let statusLabel = $derived(ganttStore.statusLabel);
+
+	// ---------------------------------------------------------------------------
+	// Write-back helpers (call store methods)
+	// ---------------------------------------------------------------------------
+
+	function handleNameInput(e: Event) {
+		const id = selectedTaskId;
+		if (!id) return;
+		ganttStore.updateTask(id, { name: (e.target as HTMLInputElement).value });
+	}
+
+	function handleProgressChange(value: number) {
+		const id = selectedTaskId;
+		if (!id) return;
+		ganttStore.updateTask(id, { progress: value });
+	}
+
+	function handleMilestoneChange(checked: boolean) {
+		const id = selectedTaskId;
+		if (!id) return;
+		ganttStore.updateTask(id, { isMilestone: checked });
+	}
+
+	function handleColorClick(color: string) {
+		const id = selectedTaskId;
+		if (!id) return;
+		ganttStore.updateTask(id, { color });
+	}
+
+	// Dependency management
+	let addingDep = $state(false);
+	let depTargetId = $state('');
+
+	/** All nodes in the current view that could be dependency targets (exclude self). */
+	let depCandidates = $derived(
+		ganttStore.rows.filter(r => r.id !== selectedTaskId)
+	);
+
+	function handleAddDependency() {
+		if (!selectedTaskId || !depTargetId) return;
+		ganttStore.addDependency(selectedTaskId, depTargetId);
+		depTargetId = '';
+		addingDep = false;
+	}
+
+	function handleRemoveDependency(targetId: string) {
+		if (!selectedTaskId) return;
+		ganttStore.removeDependency(selectedTaskId, targetId);
+	}
+
+	function handleDelete() {
+		const id = selectedTaskId;
+		if (!id) return;
+		ganttStore.deleteTask(id);
+	}
+
+	function handleClose() {
+		ganttStore.selectTask(null);
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -73,16 +126,16 @@
 			></span>
 			<Input
 				value={taskName}
-				oninput={(e) => (taskName = (e.target as HTMLInputElement).value)}
+				oninput={handleNameInput}
 				class="h-7 flex-1 border-0 bg-transparent p-0 text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0"
 			/>
-			<Badge variant="secondary" class="shrink-0">In Progress</Badge>
+			<Badge variant="secondary" class="shrink-0">{statusLabel}</Badge>
 
 			<Tooltip.Provider>
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button variant="ghost" size="icon" class="size-7 text-destructive hover:text-destructive" {...props}>
+							<Button variant="ghost" size="icon" class="size-7 text-destructive hover:text-destructive" onclick={handleDelete} {...props}>
 								<TrashIcon class="size-4" />
 								<span class="sr-only">Delete task</span>
 							</Button>
@@ -100,7 +153,7 @@
 								variant="ghost"
 								size="icon"
 								class="size-7"
-								onclick={() => (hasSelection = false)}
+								onclick={handleClose}
 								{...props}
 							>
 								<XIcon class="size-4" />
@@ -118,8 +171,8 @@
 			<Tabs.List class="mx-4 mt-2 shrink-0">
 				<Tabs.Trigger value="details">Details</Tabs.Trigger>
 				<Tabs.Trigger value="description">Description</Tabs.Trigger>
+				<Tabs.Trigger value="todos">Todos</Tabs.Trigger>
 				<Tabs.Trigger value="dependencies">Dependencies</Tabs.Trigger>
-				<Tabs.Trigger value="subtasks">Subtasks</Tabs.Trigger>
 			</Tabs.List>
 
 			<!-- Details tab -->
@@ -136,26 +189,30 @@
 									<Label class="text-xs text-muted-foreground">Start Date</Label>
 									<Button variant="outline" size="sm" class="w-full justify-start text-xs">
 										<CalendarIcon class="mr-2 size-3" />
-										Mar 15, 2026
+										{selectedTask ? formatDisplayDate(selectedTask.startDate) : "—"}
 									</Button>
 								</div>
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">End Date</Label>
 									<Button variant="outline" size="sm" class="w-full justify-start text-xs">
 										<CalendarIcon class="mr-2 size-3" />
-										Mar 30, 2026
+										{selectedTask ? formatDisplayDate(selectedTask.endDate) : "—"}
 									</Button>
 								</div>
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">Duration</Label>
 									<Input
-										value="15d"
+										value={duration}
 										readonly
 										class="h-8 text-xs"
 									/>
 								</div>
 								<div class="flex items-center gap-2 pt-4">
-									<Switch id="milestone" bind:checked={isMilestone} />
+									<Switch
+										id="milestone"
+										checked={isMilestone}
+										onCheckedChange={handleMilestoneChange}
+									/>
 									<Label for="milestone" class="text-xs">Milestone</Label>
 								</div>
 							</Card.Content>
@@ -169,15 +226,17 @@
 							<Card.Content class="space-y-3">
 								<div class="flex items-center gap-3">
 									<Slider
-										bind:value={progress}
+										type="single"
+										value={progressValue}
+										onValueChange={handleProgressChange}
 										min={0}
 										max={100}
 										step={1}
 										class="flex-1"
 									/>
-									<span class="w-10 text-right text-sm tabular-nums">{progress[0]}%</span>
+									<span class="w-10 text-right text-sm tabular-nums">{progressValue}%</span>
 								</div>
-								<Progress value={progress[0]} class="h-2" />
+								<Progress value={progressValue} class="h-2" />
 							</Card.Content>
 						</Card.Root>
 
@@ -188,36 +247,13 @@
 							</Card.Header>
 							<Card.Content class="space-y-3">
 								<div class="space-y-1">
-									<Label class="text-xs text-muted-foreground">Epic</Label>
-									<Select.Root type="single" bind:value={selectedEpic}>
-										<Select.Trigger class="w-full text-xs">
-											{#if selectedEpic}
-												{epicColors.find((e) => e.value === selectedEpic)?.label ?? "Select epic"}
-											{:else}
-												Select epic
-											{/if}
-										</Select.Trigger>
-										<Select.Content>
-											{#each epicColors as epic (epic.value)}
-												<Select.Item value={epic.value}>
-													<span class="flex items-center gap-2">
-														<span class="size-2 rounded-full" style="background-color: {epic.color}"></span>
-														{epic.label}
-													</span>
-												</Select.Item>
-											{/each}
-										</Select.Content>
-									</Select.Root>
-								</div>
-
-								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">Color</Label>
 									<div class="flex gap-2">
 										{#each taskColors as color (color)}
 											<button
 												class="size-6 rounded-full ring-offset-background transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 												style="background-color: {color}"
-												onclick={() => (selectedColor = color)}
+												onclick={() => handleColorClick(color)}
 												aria-label="Select color {color}"
 											>
 												{#if selectedColor === color}
@@ -238,6 +274,11 @@
 				<ScrollArea.Root class="h-full">
 					<div class="space-y-3 p-4">
 						<Textarea
+							value={description}
+							oninput={(e) => {
+								const id = selectedTaskId;
+								if (id) ganttStore.updateTask(id, { description: (e.target as HTMLTextAreaElement).value });
+							}}
 							placeholder="Write a description in Markdown..."
 							class="min-h-[160px] resize-none font-mono text-sm"
 						/>
@@ -250,69 +291,146 @@
 				</ScrollArea.Root>
 			</Tabs.Content>
 
-			<!-- Dependencies tab -->
-			<Tabs.Content value="dependencies" class="flex-1 overflow-hidden">
+			<!-- Todos tab -->
+			<Tabs.Content value="todos" class="flex-1 overflow-hidden">
 				<ScrollArea.Root class="h-full">
-					<div class="space-y-3 p-4">
-						<Table.Root>
-							<Table.Header>
-								<Table.Row>
-									<Table.Head class="text-xs">From Task</Table.Head>
-									<Table.Head class="text-xs">Type</Table.Head>
-									<Table.Head class="text-xs">Lag</Table.Head>
-									<Table.Head class="w-10"></Table.Head>
-								</Table.Row>
-							</Table.Header>
-							<Table.Body>
-								{#each dependencies as dep (dep.id)}
-									<Table.Row>
-										<Table.Cell class="text-xs">{dep.from}</Table.Cell>
-										<Table.Cell>
-											<Badge variant="outline" class="text-xs">{dep.type}</Badge>
-										</Table.Cell>
-										<Table.Cell class="text-xs tabular-nums">{dep.lag}</Table.Cell>
-										<Table.Cell>
-											<Button variant="ghost" size="icon" class="size-6 text-muted-foreground hover:text-destructive">
-												<XIcon class="size-3" />
-											</Button>
-										</Table.Cell>
-									</Table.Row>
-								{/each}
-							</Table.Body>
-						</Table.Root>
-						<Button variant="outline" size="sm" class="w-full text-xs">
-							<PlusIcon class="mr-1 size-3" />
-							Add Dependency
-						</Button>
+					<div class="space-y-1 p-4">
+						{#if ganttStore.selectedTask}
+							{@const todos = ganttStore.selectedTask.todos ?? []}
+							{#each todos as todo (todo.id)}
+								<div class="flex items-center gap-2 rounded p-1 hover:bg-muted/50 group">
+									<Checkbox
+										id={todo.id}
+										checked={todo.done}
+										onCheckedChange={() => ganttStore.toggleTodo(ganttStore.selectedTaskId!, todo.id)}
+									/>
+									<label
+										for={todo.id}
+										class="flex-1 cursor-pointer text-sm"
+										class:line-through={todo.done}
+										class:text-muted-foreground={todo.done}
+									>
+										{todo.text}
+									</label>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="size-6 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
+										onclick={() => ganttStore.removeTodo(ganttStore.selectedTaskId!, todo.id)}
+									>
+										<XIcon class="size-3" />
+									</Button>
+								</div>
+							{/each}
+							{#if todos.length === 0}
+								<p class="py-4 text-center text-xs text-muted-foreground">No todos yet</p>
+							{/if}
+							<Separator class="my-2" />
+							<form
+								class="flex gap-2"
+								onsubmit={(e) => {
+									e.preventDefault();
+									const form = e.target as HTMLFormElement;
+									const input = form.elements.namedItem('new-todo') as HTMLInputElement;
+									const text = input.value.trim();
+									if (text && ganttStore.selectedTaskId) {
+										ganttStore.addTodo(ganttStore.selectedTaskId, text);
+										input.value = '';
+									}
+								}}
+							>
+								<Input
+									name="new-todo"
+									placeholder="Add a todo..."
+									class="h-8 flex-1 text-xs"
+								/>
+								<Button type="submit" variant="outline" size="sm" class="text-xs">
+									<PlusIcon class="mr-1 size-3" />
+									Add
+								</Button>
+							</form>
+						{/if}
 					</div>
 				</ScrollArea.Root>
 			</Tabs.Content>
 
-			<!-- Subtasks tab -->
-			<Tabs.Content value="subtasks" class="flex-1 overflow-hidden">
+			<!-- Dependencies tab -->
+			<Tabs.Content value="dependencies" class="flex-1 overflow-hidden">
 				<ScrollArea.Root class="h-full">
-					<div class="space-y-1 p-4">
-						{#each subtasks as subtask (subtask.id)}
-							<div class="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
-								<Checkbox id={subtask.id} bind:checked={subtask.done} />
-								<label
-									for={subtask.id}
-									class="flex-1 cursor-pointer text-sm"
-									class:line-through={subtask.done}
-									class:text-muted-foreground={subtask.done}
-								>
-									{subtask.label}
-								</label>
+					<div class="space-y-3 p-4">
+						{#if resolvedDependencies.length === 0 && !addingDep}
+							<p class="py-4 text-center text-xs text-muted-foreground">No dependencies</p>
+						{:else}
+							<Table.Root>
+								<Table.Header>
+									<Table.Row>
+										<Table.Head class="text-xs">Depends On</Table.Head>
+										<Table.Head class="text-xs">Type</Table.Head>
+										<Table.Head class="w-10"></Table.Head>
+									</Table.Row>
+								</Table.Header>
+								<Table.Body>
+									{#each resolvedDependencies as dep (dep.targetId)}
+										<Table.Row>
+											<Table.Cell class="text-xs">{dep.name}</Table.Cell>
+											<Table.Cell>
+												<Badge variant="outline" class="text-xs">{dep.type}</Badge>
+											</Table.Cell>
+											<Table.Cell>
+												<Button
+													variant="ghost"
+													size="icon"
+													class="size-6 text-muted-foreground hover:text-destructive"
+													onclick={() => handleRemoveDependency(dep.targetId)}
+												>
+													<XIcon class="size-3" />
+												</Button>
+											</Table.Cell>
+										</Table.Row>
+									{/each}
+								</Table.Body>
+							</Table.Root>
+						{/if}
+
+						{#if addingDep}
+							<div class="flex items-center gap-2">
+								<Select.Root type="single" bind:value={depTargetId}>
+									<Select.Trigger class="flex-1 text-xs">
+										{#if depTargetId}
+											{@const target = depCandidates.find(r => r.id === depTargetId)}
+											{target?.name ?? 'Select task'}
+										{:else}
+											Select task...
+										{/if}
+									</Select.Trigger>
+									<Select.Content>
+										{#each depCandidates as candidate (candidate.id)}
+											<Select.Item value={candidate.id}>
+												<span class="flex items-center gap-2">
+													<span class="size-2 rounded-full" style="background-color: {candidate.color}"></span>
+													{candidate.name}
+												</span>
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<Button size="sm" class="shrink-0 text-xs" onclick={handleAddDependency} disabled={!depTargetId}>
+									Add
+								</Button>
+								<Button variant="ghost" size="sm" class="shrink-0 text-xs" onclick={() => { addingDep = false; depTargetId = ''; }}>
+									Cancel
+								</Button>
 							</div>
-						{/each}
-						<Separator class="my-2" />
-						<Button variant="outline" size="sm" class="w-full text-xs">
-							<PlusIcon class="mr-1 size-3" />
-							Add Subtask
-						</Button>
+						{:else}
+							<Button variant="outline" size="sm" class="w-full text-xs" onclick={() => (addingDep = true)}>
+								<PlusIcon class="mr-1 size-3" />
+								Add Dependency
+							</Button>
+						{/if}
 					</div>
 				</ScrollArea.Root>
 			</Tabs.Content>
+
 		</Tabs.Root>
 	{/if}
 </div>
