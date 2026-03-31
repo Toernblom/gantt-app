@@ -1,5 +1,6 @@
 <script lang="ts">
   import "../routes/layout.css";
+  import { ModeWatcher } from "mode-watcher";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import { Toaster } from "$lib/components/ui/sonner/index.js";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
@@ -19,5 +20,6 @@
   </Sidebar.Inset>
 </Sidebar.Provider>
 
+<ModeWatcher defaultMode="dark" />
 <CommandPalette />
 <Toaster />

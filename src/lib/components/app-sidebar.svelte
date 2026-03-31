@@ -9,6 +9,7 @@
 
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+	import ModeToggle from "$lib/components/mode-toggle.svelte";
 
 	import { ganttStore } from "$lib/stores/gantt/index.js";
 	import { projectStore } from "$lib/stores/project/index.js";
@@ -141,6 +142,9 @@
 	<!-- Footer -->
 	<Sidebar.Footer>
 		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<ModeToggle />
+			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton tooltipContent="Settings">
 					<SettingsIcon />

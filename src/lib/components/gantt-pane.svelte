@@ -114,6 +114,17 @@
 					<ToggleGroup.Item value="quarter">Qtr</ToggleGroup.Item>
 				</ToggleGroup.Root>
 
+				<!-- UI scale indicator (only when not 100%) -->
+				{#if ganttStore.uiScale !== 1}
+					<button
+						class="rounded px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground hover:bg-muted hover:text-foreground"
+						onclick={() => ganttStore.resetUiScale()}
+						title="Reset zoom (Ctrl+0)"
+					>
+						{Math.round(ganttStore.uiScale * 100)}%
+					</button>
+				{/if}
+
 				<Separator orientation="vertical" class="h-4" />
 			{/if}
 

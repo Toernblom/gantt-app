@@ -24,6 +24,9 @@ class GanttStore {
   viewMode = $state<'gantt' | 'kanban'>(
     (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('gantt-viewMode') as 'gantt' | 'kanban') || 'gantt'
   );
+  uiScale = $state<number>(
+    (typeof sessionStorage !== 'undefined' && parseFloat(sessionStorage.getItem('gantt-uiScale') ?? '')) || 1
+  );
 
   // --- Derived: navigation ---
   focusedNode = $derived<GanttNode | null>(
@@ -181,6 +184,15 @@ class GanttStore {
     if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-viewMode', mode);
   }
 
+  setUiScale(scale: number): void {
+    this.uiScale = Math.round(Math.max(0.5, Math.min(2, scale)) * 100) / 100;
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-uiScale', String(this.uiScale));
+  }
+
+  resetUiScale(): void {
+    this.setUiScale(1);
+  }
+
   // --- Methods: todos ---
   addTodo(taskId: string, text: string): void {
     const node = findNodeById(projectStore.project.children, taskId);
@@ -256,6 +268,13 @@ class GanttStore {
 
   // --- Methods: keyboard navigation (from gantt-chart.svelte) ---
   handleKeyDown(e: KeyboardEvent): void {
+    // Ctrl+0: reset UI scale
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+      e.preventDefault();
+      this.resetUiScale();
+      return;
+    }
+
     const rows = this.rows;
     if (rows.length === 0) return;
 

@@ -12,7 +12,7 @@ Modern, local-first Gantt chart project management tool. No cloud, no subscripti
 - **Exception:** Per-instance SVG drag/resize state stays local in `gantt-bar.svelte` and `gantt-milestone.svelte`.
 - **Store dependency order:** `projectStore` -> `ganttStore` -> `timelineStore` / `dialogStore`. No circular dependencies.
 - **Don't modify `src/lib/components/ui/`** — these are shadcn-svelte generated primitives.
-- **Dark theme only.** No light mode.
+- **Theming:** Light/dark/system via `mode-watcher`. Default is dark. Toggle lives in the sidebar footer.
 
 ## Commands
 

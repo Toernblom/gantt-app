@@ -24,16 +24,16 @@
 		if (rowIndex === -1) return;
 
 		const row = ganttStore.rows[rowIndex];
-		const scale = timelineStore.timeScale;
+		const tScale = timelineStore.timeScale;
 
-		// Vertical: center the row in the viewport
+		// With CSS zoom, layout coordinates are already scaled by the browser,
+		// so scroll offsets are in zoomed space — no manual scale factor needed.
 		const rowTop = HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
 		const rowCenter = rowTop + ROW_HEIGHT / 2;
 		const targetScrollTop = rowCenter - scrollEl.clientHeight / 2;
 
-		// Horizontal: center the bar midpoint in the viewport
-		const barLeft = scale(new Date(row.startDate));
-		const barRight = scale(new Date(row.endDate));
+		const barLeft = tScale(new Date(row.startDate));
+		const barRight = tScale(new Date(row.endDate));
 		const barCenter = TASK_LIST_WIDTH + (barLeft + barRight) / 2;
 		const targetScrollLeft = barCenter - scrollEl.clientWidth / 2;
 
@@ -43,6 +43,18 @@
 			behavior: 'smooth',
 		});
 	});
+
+	// -------------------------------------------------------------------------
+	// Ctrl+wheel zoom (UI scale)
+	// -------------------------------------------------------------------------
+
+	function handleWheel(e: WheelEvent) {
+		if (!e.ctrlKey && !e.metaKey) return;
+		e.preventDefault();
+		const delta = e.deltaY > 0 ? -0.1 : 0.1;
+		ganttStore.setUiScale(ganttStore.uiScale + delta);
+	}
+
 </script>
 
 <!--
@@ -64,6 +76,7 @@
 		class="gantt-scroll h-full overflow-auto outline-none"
 		tabindex="0"
 		onkeydown={(e) => ganttStore.handleKeyDown(e)}
+		onwheel={handleWheel}
 	>
 		<div
 			class="relative grid"
@@ -71,6 +84,7 @@
 				grid-template-columns: {TASK_LIST_WIDTH}px {timelineStore.totalWidth}px;
 				grid-template-rows: {HEADER_HEIGHT}px {timelineStore.totalHeight}px;
 				width: {TASK_LIST_WIDTH + timelineStore.totalWidth}px;
+				zoom: {ganttStore.uiScale};
 			"
 		>
 			<!-- Corner cell: sticky top + left (highest z) -->

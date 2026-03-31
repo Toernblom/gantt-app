@@ -78,7 +78,7 @@
 				role="row"
 				data-row-id={row.id}
 				style="height: {ROW_HEIGHT}px;"
-				class="relative flex cursor-pointer items-center pr-2
+				class="relative flex cursor-pointer items-center overflow-hidden pr-2
 					[transition:background-color_120ms]
 					{isSelected
 					? 'bg-accent/60 text-accent-foreground'
