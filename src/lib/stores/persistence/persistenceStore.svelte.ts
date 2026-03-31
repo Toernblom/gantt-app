@@ -179,7 +179,8 @@ class PersistenceStore {
   /** Set the active directory and start the file watcher. */
   private async _setActiveDir(dirPath: string): Promise<void> {
     this.activeDirPath = dirPath;
-    await this._startWatching(dirPath);
+    // Start watcher in background — don't let failure block project open
+    this._startWatching(dirPath).catch(() => {});
   }
 }
 
