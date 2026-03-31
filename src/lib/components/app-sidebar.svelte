@@ -144,6 +144,11 @@
 	<!-- Footer -->
 	<Sidebar.Footer>
 		<Sidebar.Menu>
+			{#if updaterStore.error}
+				<Sidebar.MenuItem>
+					<span class="px-2 py-1 text-xs text-destructive truncate">{updaterStore.error}</span>
+				</Sidebar.MenuItem>
+			{/if}
 			{#if updaterStore.available}
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton

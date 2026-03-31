@@ -41,10 +41,15 @@ class UpdaterStore {
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (e) {
-      this.error = e instanceof Error ? e.message : String(e);
-    } finally {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('Update install failed:', msg);
+      this.error = msg;
       this.downloading = false;
+      return;
     }
+    // Only reached if downloadAndInstall succeeded — relaunch handles the rest
+    // If we get here without relaunch, reset state
+    this.downloading = false;
   }
 }
 
