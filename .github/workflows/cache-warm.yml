@@ -34,6 +34,6 @@ jobs:
           restore-keys: |
             rust-release-
 
-      - name: Build Rust dependencies only
+      - name: Build Rust dependencies
         working-directory: src-tauri
-        run: cargo check --release
+        run: cargo build --release
