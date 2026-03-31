@@ -1,6 +1,6 @@
 [package]
 name = "gantt-app"
-version = "0.1.5"
+version = "0.1.6"
 description = "A Gantt chart project management tool"
 authors = ["you"]
 license = ""
@@ -21,7 +21,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-fs = { version = "2", features = ["watch"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
