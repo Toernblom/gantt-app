@@ -24,12 +24,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: actions/cache@v4
         with:
-          workspaces: src-tauri -> target
-          shared-key: tauri-build
-          save-if: true
+          path: |
+            src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-release-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            rust-release-
 
       - name: Build Rust dependencies only
         working-directory: src-tauri
-        run: cargo check
+        run: cargo check --release
