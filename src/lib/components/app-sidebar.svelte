@@ -4,6 +4,7 @@
 	import GanttChartIcon from "@tabler/icons-svelte/icons/chart-bar";
 	import ListIcon from "@tabler/icons-svelte/icons/list";
 	import SettingsIcon from "@tabler/icons-svelte/icons/settings";
+	import DownloadIcon from "@tabler/icons-svelte/icons/download";
 	import FolderIcon from "@tabler/icons-svelte/icons/folder";
 	import TrashIcon from "@tabler/icons-svelte/icons/trash";
 
@@ -15,6 +16,7 @@
 	import { projectStore } from "$lib/stores/project/index.js";
 	import { persistenceStore } from "$lib/stores/persistence/index.js";
 	import type { RecentEntry } from "$lib/stores/persistence/index.js";
+	import { updaterStore } from "$lib/stores/updater/index.js";
 
 	const sidebar = Sidebar.useSidebar();
 
@@ -142,6 +144,23 @@
 	<!-- Footer -->
 	<Sidebar.Footer>
 		<Sidebar.Menu>
+			{#if updaterStore.available}
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton
+						tooltipContent="Update to v{updaterStore.version}"
+						onclick={() => updaterStore.install()}
+					>
+						<DownloadIcon class={updaterStore.downloading ? 'animate-bounce' : ''} />
+						<span class="flex-1 truncate">
+							{#if updaterStore.downloading}
+								Installing...
+							{:else}
+								Update to v{updaterStore.version}
+							{/if}
+						</span>
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			{/if}
 			<Sidebar.MenuItem>
 				<ModeToggle />
 			</Sidebar.MenuItem>

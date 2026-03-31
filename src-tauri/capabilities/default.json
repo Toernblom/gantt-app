@@ -11,6 +11,8 @@
     "fs:allow-exists",
     "fs:allow-watch",
     "dialog:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

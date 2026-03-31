@@ -5,8 +5,12 @@
   import { Toaster } from "$lib/components/ui/sonner/index.js";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import CommandPalette from "$lib/components/command-palette.svelte";
+  import { updaterStore } from "$lib/stores/updater/index.js";
 
   let { children } = $props();
+
+  // Check for updates on startup (silent — only shows UI when update is available)
+  updaterStore.check();
 </script>
 
 <svelte:head>
