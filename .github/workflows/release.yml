@@ -14,6 +14,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract changelog
+        id: changelog
+        shell: pwsh
+        run: |
+          $content = Get-Content CHANGELOG.md -Raw
+          # Match first ## section (everything between first ## and second ##)
+          if ($content -match '(?s)## [^\r\n]+\r?\n(.*?)(?=\r?\n## |\z)') {
+            $body = $Matches[1].Trim()
+          } else {
+            $body = "Bug fixes and improvements."
+          }
+          # Write to GitHub output using delimiter
+          $delimiter = "EOF_$(Get-Random)"
+          "BODY<<$delimiter" >> $env:GITHUB_OUTPUT
+          $body >> $env:GITHUB_OUTPUT
+          $delimiter >> $env:GITHUB_OUTPUT
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -42,7 +59,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Gantt App ${{ github.ref_name }}'
-          releaseBody: 'See the assets below to download and install.'
+          releaseBody: ${{ steps.changelog.outputs.BODY }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
