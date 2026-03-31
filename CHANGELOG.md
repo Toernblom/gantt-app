@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9
+
+- "What's New" dialog now works on consecutive updates
+- Faster CI builds with stabilized Rust cache
+
 ## 0.1.8
 
 - Fixed "What's New" dialog not appearing after update
