@@ -4,6 +4,7 @@ import type { GanttNode } from '$lib/types';
 
 export interface PriorityItem {
   task: GanttNode;
+  progress: number;         // effective progress (todo-based or manual)
   score: number;
   ready: boolean;
   blockedBy: string[];      // names of incomplete dependency tasks
@@ -28,8 +29,13 @@ class PriorityStore {
     const items: PriorityItem[] = [];
 
     for (const task of allNodes) {
+      // Effective progress: from todos if present, otherwise manual
+      const progress = (task.todos && task.todos.length > 0)
+        ? Math.round(task.todos.filter(t => t.done).length / task.todos.length * 100)
+        : task.progress;
+
       // Skip completed and milestones
-      if (task.progress >= 100) continue;
+      if (progress >= 100) continue;
       if (task.isMilestone) continue;
       // Skip parent/epic nodes (nodes with children) — focus on leaf work
       if (task.children.length > 0) continue;
@@ -37,12 +43,25 @@ class PriorityStore {
       let score = 0;
       const reasons: string[] = [];
 
-      // Check dependency readiness
+      // Check dependency readiness — own deps + inherited strict deps from ancestors
       const blockedBy: string[] = [];
+      // Own dependencies
       for (const dep of task.dependencies) {
         const target = findNodeById(projectStore.project.children, dep.targetId);
-        if (target && target.progress < 100) {
+        if (target && this._effectiveProgress(target) < 100) {
           blockedBy.push(target.name);
+        }
+      }
+      // Inherited: walk up ancestors — if any ancestor has requireDepsComplete,
+      // check that ancestor's prerequisites are all 100%
+      const ancestors = this._getAncestors(task.id, projectStore.project.children);
+      for (const ancestor of ancestors) {
+        if (!ancestor.requireDepsComplete) continue;
+        for (const dep of ancestor.dependencies) {
+          const target = findNodeById(projectStore.project.children, dep.targetId);
+          if (target && this._effectiveProgress(target) < 100 && !blockedBy.includes(target.name)) {
+            blockedBy.push(target.name);
+          }
         }
       }
       const ready = blockedBy.length === 0;
@@ -52,9 +71,9 @@ class PriorityStore {
       }
 
       // In-progress bonus
-      if (task.progress > 0) {
+      if (progress > 0) {
         score += 25;
-        reasons.push(`${task.progress}% done — finish it`);
+        reasons.push(`${progress}% done`);
       }
 
       // Downstream impact
@@ -91,6 +110,7 @@ class PriorityStore {
 
       items.push({
         task,
+        progress,
         score,
         ready,
         blockedBy,
@@ -107,6 +127,34 @@ class PriorityStore {
   // Split for rendering convenience
   readyItems = $derived(this.items.filter(i => i.ready));
   blockedItems = $derived(this.items.filter(i => !i.ready));
+
+  /** Get effective progress for a node (todo-based for leaves with todos, manual otherwise, recursive for parents). */
+  private _effectiveProgress(node: GanttNode): number {
+    if (node.children.length > 0) {
+      // Parent: check if all children are effectively done
+      const childProgresses = node.children.map(c => this._effectiveProgress(c));
+      const total = childProgresses.reduce((a, b) => a + b, 0);
+      return Math.round(total / node.children.length);
+    }
+    if (node.todos && node.todos.length > 0) {
+      return Math.round(node.todos.filter(t => t.done).length / node.todos.length * 100);
+    }
+    return node.progress;
+  }
+
+  /** Walk the tree to find all ancestors of a target node (parent, grandparent, etc.). */
+  private _getAncestors(targetId: string, roots: GanttNode[]): GanttNode[] {
+    const path: GanttNode[] = [];
+    const find = (nodes: GanttNode[], trail: GanttNode[]): boolean => {
+      for (const node of nodes) {
+        if (node.id === targetId) { path.push(...trail); return true; }
+        if (node.children.length > 0 && find(node.children, [...trail, node])) return true;
+      }
+      return false;
+    };
+    find(roots, []);
+    return path;
+  }
 
   private _collectAll(nodes: GanttNode[]): GanttNode[] {
     const result: GanttNode[] = [];

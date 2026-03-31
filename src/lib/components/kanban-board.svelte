@@ -6,7 +6,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
 
   import { kanbanStore } from '$lib/stores/kanban/index.js';
-  import { ganttStore } from '$lib/stores/gantt/index.js';
+  import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
   import KanbanColumn from './kanban-column.svelte';
 
   let isAddingColumn = $state(false);

@@ -4,8 +4,9 @@
 	import GanttHeader from "./gantt-header.svelte";
 
 	import { TASK_LIST_WIDTH, ROW_HEIGHT } from "$lib/types.js";
-	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { timelineStore } from "$lib/stores/timeline/index.js";
+	import { interactionStore } from "$lib/stores/interaction/interactionStore.svelte.js";
 	import LayoutGridIcon from "@tabler/icons-svelte/icons/layout-grid";
 
 	const HEADER_HEIGHT = 64;
@@ -77,6 +78,7 @@
 		tabindex="0"
 		onkeydown={(e) => ganttStore.handleKeyDown(e)}
 		onwheel={handleWheel}
+		onclick={() => interactionStore.clearDependencySelection()}
 	>
 		<div
 			class="relative grid"

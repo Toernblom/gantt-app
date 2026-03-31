@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ScaleTime } from 'd3-scale';
-	import { ganttStore } from '$lib/stores/gantt/index.js';
-	import { interactionStore } from '$lib/stores/interaction/index.js';
+	import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
+	import { interactionStore } from '$lib/stores/interaction/interactionStore.svelte.js';
 	import { ROW_HEIGHT } from '$lib/types';
 
 	import GanttGrid from './gantt-grid.svelte';

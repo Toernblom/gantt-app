@@ -12,7 +12,7 @@
 	import TaskCreateDialog from "./task-create-dialog.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
-	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { dialogStore } from "$lib/stores/dialog/index.js";
 	import { persistenceStore } from "$lib/stores/persistence/index.js";
 	import { historyStore } from "$lib/stores/history/index.js";

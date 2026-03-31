@@ -2,8 +2,8 @@
 	import type { ScaleTime } from 'd3-scale';
 	import type { GanttRow } from '$lib/types';
 	import { ROW_HEIGHT } from '$lib/types';
-	import { ganttStore } from '$lib/stores/gantt/index.js';
-	import { interactionStore } from '$lib/stores/interaction/index.js';
+	import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
+	import { interactionStore } from '$lib/stores/interaction/interactionStore.svelte.js';
 	import { roundDate, addTime, toLocalIso } from '$lib/utils/timeline';
 
 	interface Props {
@@ -160,6 +160,56 @@
 	let previewWidth = $derived(isResizing && snapPreview ? snapPreview.width : barWidth);
 
 	// -------------------------------------------------------------------------
+	// Long-press detection for dependency linking
+	// -------------------------------------------------------------------------
+
+	const HOLD_THRESHOLD_MS = 500;
+	const MOVE_THRESHOLD_PX = 4;
+	let holdTimer: ReturnType<typeof setTimeout> | null = null;
+	let holdStartClientX = 0;
+	let holdStartClientY = 0;
+	let holdTriggered = false;
+
+	function clearHoldTimer() {
+		if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+	}
+
+	function onHoldMove(e: MouseEvent) {
+		// If mouse moved beyond threshold, cancel hold and start normal drag
+		const dx = e.clientX - holdStartClientX;
+		const dy = e.clientY - holdStartClientY;
+		if (Math.abs(dx) > MOVE_THRESHOLD_PX || Math.abs(dy) > MOVE_THRESHOLD_PX) {
+			clearHoldTimer();
+			window.removeEventListener('mousemove', onHoldMove);
+			window.removeEventListener('mouseup', onHoldUp);
+			if (!holdTriggered) {
+				// Transition to normal drag
+				startNormalDrag();
+			}
+		}
+	}
+
+	function onHoldUp() {
+		clearHoldTimer();
+		window.removeEventListener('mousemove', onHoldMove);
+		window.removeEventListener('mouseup', onHoldUp);
+		// Released before hold threshold and without moving — it's a click, not a drag
+	}
+
+	function startNormalDrag() {
+		isDragging = true;
+		dragStartSvgX = clientXToSvgX(holdStartClientX, holdStartClientY);
+		dragOriginalStart = row.startDate;
+		dragOriginalEnd = row.endDate;
+		dragOffsetX = 0;
+
+		document.body.style.userSelect = 'none';
+
+		window.addEventListener('mousemove', handleDragMove);
+		window.addEventListener('mouseup', handleDragEnd);
+	}
+
+	// -------------------------------------------------------------------------
 	// Drag-to-move handlers
 	// -------------------------------------------------------------------------
 
@@ -170,29 +220,26 @@
 
 		if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
 
-		// Shift+click: start dependency link mode
-		if (e.shiftKey) {
+		// If we're in link mode, don't start a new drag — mouseup handles completion
+		if (interactionStore.isLinking) return;
+
+		captureSvg(e);
+		holdStartClientX = e.clientX;
+		holdStartClientY = e.clientY;
+		holdTriggered = false;
+
+		// Start hold timer — if held without moving, enter dependency link mode
+		holdTimer = setTimeout(() => {
+			holdTriggered = true;
+			window.removeEventListener('mousemove', onHoldMove);
+			window.removeEventListener('mouseup', onHoldUp);
 			const anchorX = endDateToX(row.endDate);
 			const anchorY = rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 			interactionStore.startLink(row.id, anchorX, anchorY, e);
-			return;
-		}
+		}, HOLD_THRESHOLD_MS);
 
-		// If we're in link mode, complete the link on this bar
-		if (interactionStore.handleBarClick(row.id)) return;
-
-		captureSvg(e);
-
-		isDragging = true;
-		dragStartSvgX = clientXToSvgX(e.clientX, e.clientY);
-		dragOriginalStart = row.startDate;
-		dragOriginalEnd = row.endDate;
-		dragOffsetX = 0;
-
-		document.body.style.userSelect = 'none';
-
-		window.addEventListener('mousemove', handleDragMove);
-		window.addEventListener('mouseup', handleDragEnd);
+		window.addEventListener('mousemove', onHoldMove);
+		window.addEventListener('mouseup', onHoldUp);
 	}
 
 	function handleDragMove(e: MouseEvent) {
@@ -263,10 +310,14 @@
 	// Click / double-click handlers
 	// -------------------------------------------------------------------------
 
+	function handleMouseUp() {
+		// If in link mode, complete the link on release over this bar
+		interactionStore.handleBarMouseUp(row.id);
+	}
+
 	function handleClick() {
 		if (isDragging || isResizing) return;
-		// If in link mode, complete the link
-		if (interactionStore.handleBarClick(row.id)) return;
+		if (interactionStore.isLinking) return;
 		if (clickTimer) return;
 		clickTimer = setTimeout(() => {
 			ganttStore.selectTask(row.id);
@@ -294,7 +345,9 @@
 	// Derived cursor
 	// -------------------------------------------------------------------------
 
-	let gCursor = $derived(isDragging ? 'grabbing' : 'grab');
+	let gCursor = $derived(
+		interactionStore.isLinking ? 'crosshair' : isDragging ? 'grabbing' : 'grab'
+	);
 
 	// -------------------------------------------------------------------------
 	// Tooltip text
@@ -354,6 +407,7 @@
 	onclick={handleClick}
 	ondblclick={handleDoubleClick}
 	onmousedown={handleDragStart}
+	onmouseup={handleMouseUp}
 	onmouseenter={handleMouseEnter}
 	onmouseleave={handleMouseLeave}
 	style="cursor: {gCursor}; {isDragging ? `transform: translate(${dragOffsetX}px, 0)` : ''}"

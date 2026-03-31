@@ -1,5 +1,5 @@
 import { projectStore } from '../project/index.js';
-import { ganttStore } from '../gantt/index.js';
+import { ganttStore } from '../gantt/ganttStore.svelte.js';
 import type { GanttNode, KanbanColumn } from '$lib/types';
 import { findNodeById } from '../gantt/helpers.js';
 

@@ -2,7 +2,8 @@
 	import type { ScaleTime } from 'd3-scale';
 	import type { GanttRow, DependencyType } from '$lib/types';
 	import { ROW_HEIGHT } from '$lib/types';
-	import { ganttStore } from '$lib/stores/gantt/index.js';
+	import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
+	import { interactionStore } from '$lib/stores/interaction/interactionStore.svelte.js';
 	import { addTime } from '$lib/utils/timeline';
 
 	interface Props {
@@ -23,6 +24,22 @@
 	const R = 6; // corner radius
 
 	let hovered = $state(false);
+
+	// The dependent task (targetRow) owns the dependency pointing at sourceRow (the prereq)
+	let isSelected = $derived(
+		interactionStore.selectedDep?.taskId === targetRow.id &&
+		interactionStore.selectedDep?.targetId === sourceRow.id
+	);
+
+	function handleClick(e: MouseEvent) {
+		e.stopPropagation();
+		interactionStore.selectDependency(targetRow.id, sourceRow.id);
+	}
+
+	let strokeColor = $derived(
+		isSelected ? '#ef4444' : hovered ? STROKE_HOVER : STROKE_COLOR
+	);
+	let strokeWidth = $derived(isSelected ? 2.5 : 1.5);
 
 	/**
 	 * Finish edge = right side of the end-date column (endDate + 1 snap unit)
@@ -130,17 +147,29 @@
 		refY="3"
 		orient="auto"
 	>
-		<path d="M 0 0 L 8 3 L 0 6 Z" fill={hovered ? STROKE_HOVER : STROKE_COLOR} />
+		<path d="M 0 0 L 8 3 L 0 6 Z" fill={strokeColor} />
 	</marker>
 </defs>
 
+<!-- Wide invisible hit area for easier clicking -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <path
 	d={path}
-	stroke={hovered ? STROKE_HOVER : STROKE_COLOR}
-	stroke-width="1.5"
+	stroke="transparent"
+	stroke-width="12"
 	fill="none"
-	marker-end="url(#{markerId})"
+	style="cursor: pointer;"
+	onclick={handleClick}
 	onmouseenter={() => (hovered = true)}
 	onmouseleave={() => (hovered = false)}
+/>
+<!-- Visible arrow -->
+<path
+	d={path}
+	stroke={strokeColor}
+	stroke-width={strokeWidth}
+	fill="none"
+	marker-end="url(#{markerId})"
+	pointer-events="none"
 />

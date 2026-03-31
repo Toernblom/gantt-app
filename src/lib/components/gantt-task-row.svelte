@@ -7,7 +7,7 @@
 	import * as ContextMenu from "$lib/components/ui/context-menu/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 
-	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { dialogStore } from "$lib/stores/dialog/index.js";
 	import { ROW_HEIGHT } from "$lib/types.js";
 	import type { GanttRow } from "$lib/types.js";

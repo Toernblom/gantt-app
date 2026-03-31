@@ -10,7 +10,7 @@
   import { Separator } from '$lib/components/ui/separator/index.js';
 
   import { priorityStore } from '$lib/stores/priority/index.js';
-  import { ganttStore } from '$lib/stores/gantt/index.js';
+  import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
   import type { PriorityItem } from '$lib/stores/priority/index.js';
 
   let showBlocked = $state(false);
@@ -71,10 +71,10 @@
                 </Badge>
               {/if}
             </div>
-            {#if item.task.progress > 0}
+            {#if item.progress > 0}
               <div class="mt-2 flex items-center gap-2">
-                <Progress value={item.task.progress} class="h-1.5 flex-1" />
-                <span class="text-[10px] tabular-nums text-muted-foreground">{item.task.progress}%</span>
+                <Progress value={item.progress} class="h-1.5 flex-1" />
+                <span class="text-[10px] tabular-nums text-muted-foreground">{item.progress}%</span>
               </div>
             {/if}
           </div>

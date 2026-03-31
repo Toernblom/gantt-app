@@ -1,4 +1,4 @@
-import { ganttStore } from '../gantt/index.js';
+import { ganttStore } from '../gantt/ganttStore.svelte.js';
 import { ROW_HEIGHT } from '$lib/types';
 import { createTimeScale, padDateRange } from '$lib/utils/timeline.js';
 import type { ScaleTime } from 'd3-scale';

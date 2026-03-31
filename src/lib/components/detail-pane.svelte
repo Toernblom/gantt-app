@@ -28,7 +28,7 @@
 	import { parseDate } from "@internationalized/date";
 	import type { DateValue } from "@internationalized/date";
 
-	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { formatDisplayDate } from "$lib/utils/timeline";
 
 	// ---------------------------------------------------------------------------
@@ -48,6 +48,7 @@
 
 	let taskName = $derived(selectedTask?.name ?? "");
 	let isParent = $derived((selectedTask?.children?.length ?? 0) > 0);
+	let isAutoProgress = $derived(selectedTask ? ganttStore.isAutoProgress(selectedTask.id) : false);
 	let progressValue = $derived(
 		selectedTask ? ganttStore.getEffectiveProgress(selectedTask.id) : 0
 	);
@@ -128,6 +129,19 @@
 
 	function isoToDateValue(iso: string): DateValue | undefined {
 		try { return parseDate(iso); } catch { return undefined; }
+	}
+
+	/** Recursively collect todos from all descendants, tagged with their task name/id. */
+	function collectChildTodos(node: import('$lib/types').GanttNode): { todo: import('$lib/types').Todo; taskId: string; taskName: string }[] {
+		const result: { todo: import('$lib/types').Todo; taskId: string; taskName: string }[] = [];
+		const walk = (n: import('$lib/types').GanttNode) => {
+			for (const todo of n.todos ?? []) {
+				result.push({ todo, taskId: n.id, taskName: n.name });
+			}
+			for (const child of n.children) walk(child);
+		};
+		for (const child of node.children) walk(child);
+		return result;
 	}
 </script>
 
@@ -280,11 +294,11 @@
 										min={0}
 										max={100}
 										step={1}
-										disabled={isParent}
+										disabled={isAutoProgress}
 										class="flex-1"
 									/>
 									<span class="w-10 text-right text-sm tabular-nums">{progressValue}%</span>
-									{#if isParent}
+									{#if isAutoProgress}
 										<span class="text-xs text-muted-foreground">(auto)</span>
 									{/if}
 								</div>
@@ -315,6 +329,23 @@
 										{/each}
 									</div>
 								</div>
+
+								<!-- Strict sequencing toggle — only show if task has dependencies -->
+								{#if selectedTask && selectedTask.dependencies.length > 0}
+									<div class="flex items-center gap-2 pt-2">
+										<Switch
+											id="require-deps"
+											checked={selectedTask.requireDepsComplete ?? false}
+											onCheckedChange={(checked) => {
+												if (selectedTaskId) ganttStore.updateTask(selectedTaskId, { requireDepsComplete: checked });
+											}}
+										/>
+										<div class="flex flex-col">
+											<Label for="require-deps" class="text-xs cursor-pointer">Strict sequencing</Label>
+											<span class="text-[10px] text-muted-foreground">Hide from Up Next until predecessors are 100% done</span>
+										</div>
+									</div>
+								{/if}
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -331,14 +362,9 @@
 								const id = selectedTaskId;
 								if (id) ganttStore.updateTask(id, { description: (e.target as HTMLTextAreaElement).value });
 							}}
-							placeholder="Write a description in Markdown..."
+							placeholder="Write a description..."
 							class="min-h-[160px] resize-none font-mono text-sm"
 						/>
-						<Separator />
-						<p class="text-xs text-muted-foreground">
-							Supports <strong>Markdown</strong> formatting. Use **bold**, *italic*, `code`, and
-							[links](url).
-						</p>
 					</div>
 				</ScrollArea.Root>
 			</Tabs.Content>
@@ -348,59 +374,96 @@
 				<ScrollArea.Root class="h-full">
 					<div class="space-y-1 p-4">
 						{#if ganttStore.selectedTask}
-							{@const todos = ganttStore.selectedTask.todos ?? []}
-							{#each todos as todo (todo.id)}
-								<div class="flex items-center gap-2 rounded p-1 hover:bg-muted/50 group">
-									<Checkbox
-										id={todo.id}
-										checked={todo.done}
-										onCheckedChange={() => ganttStore.toggleTodo(ganttStore.selectedTaskId!, todo.id)}
+							{#if isParent}
+								<!-- Parent/epic: show aggregated todos from all children -->
+								{@const childTodos = collectChildTodos(ganttStore.selectedTask)}
+								{#each childTodos as entry (entry.todo.id)}
+									<div class="flex items-center gap-2 rounded p-1 hover:bg-muted/50 group">
+										<Checkbox
+											id={entry.todo.id}
+											checked={entry.todo.done}
+											onCheckedChange={() => ganttStore.toggleTodo(entry.taskId, entry.todo.id)}
+										/>
+										<div class="flex min-w-0 flex-1 flex-col">
+											<label
+												for={entry.todo.id}
+												class="cursor-pointer text-sm"
+												class:line-through={entry.todo.done}
+												class:text-muted-foreground={entry.todo.done}
+											>
+												{entry.todo.text}
+											</label>
+											<span class="text-[10px] text-muted-foreground">{entry.taskName}</span>
+										</div>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-6 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
+											onclick={() => ganttStore.removeTodo(entry.taskId, entry.todo.id)}
+										>
+											<XIcon class="size-3" />
+										</Button>
+									</div>
+								{/each}
+								{#if childTodos.length === 0}
+									<p class="py-4 text-center text-xs text-muted-foreground">No todos in child tasks</p>
+								{/if}
+							{:else}
+								<!-- Leaf task: show own todos with add form -->
+								{@const todos = ganttStore.selectedTask.todos ?? []}
+								{#each todos as todo (todo.id)}
+									<div class="flex items-center gap-2 rounded p-1 hover:bg-muted/50 group">
+										<Checkbox
+											id={todo.id}
+											checked={todo.done}
+											onCheckedChange={() => ganttStore.toggleTodo(ganttStore.selectedTaskId!, todo.id)}
+										/>
+										<label
+											for={todo.id}
+											class="flex-1 cursor-pointer text-sm"
+											class:line-through={todo.done}
+											class:text-muted-foreground={todo.done}
+										>
+											{todo.text}
+										</label>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-6 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
+											onclick={() => ganttStore.removeTodo(ganttStore.selectedTaskId!, todo.id)}
+										>
+											<XIcon class="size-3" />
+										</Button>
+									</div>
+								{/each}
+								{#if todos.length === 0}
+									<p class="py-4 text-center text-xs text-muted-foreground">No todos yet</p>
+								{/if}
+								<Separator class="my-2" />
+								<form
+									class="flex gap-2"
+									onsubmit={(e) => {
+										e.preventDefault();
+										const form = e.target as HTMLFormElement;
+										const input = form.elements.namedItem('new-todo') as HTMLInputElement;
+										const text = input.value.trim();
+										if (text && ganttStore.selectedTaskId) {
+											ganttStore.addTodo(ganttStore.selectedTaskId, text);
+											input.value = '';
+										}
+									}}
+								>
+									<Input
+										name="new-todo"
+										placeholder="Add a todo..."
+										class="h-8 flex-1 text-xs"
 									/>
-									<label
-										for={todo.id}
-										class="flex-1 cursor-pointer text-sm"
-										class:line-through={todo.done}
-										class:text-muted-foreground={todo.done}
-									>
-										{todo.text}
-									</label>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-6 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
-										onclick={() => ganttStore.removeTodo(ganttStore.selectedTaskId!, todo.id)}
-									>
-										<XIcon class="size-3" />
+									<Button type="submit" variant="outline" size="sm" class="text-xs">
+										<PlusIcon class="mr-1 size-3" />
+										Add
 									</Button>
-								</div>
-							{/each}
-							{#if todos.length === 0}
-								<p class="py-4 text-center text-xs text-muted-foreground">No todos yet</p>
+								</form>
 							{/if}
-							<Separator class="my-2" />
-							<form
-								class="flex gap-2"
-								onsubmit={(e) => {
-									e.preventDefault();
-									const form = e.target as HTMLFormElement;
-									const input = form.elements.namedItem('new-todo') as HTMLInputElement;
-									const text = input.value.trim();
-									if (text && ganttStore.selectedTaskId) {
-										ganttStore.addTodo(ganttStore.selectedTaskId, text);
-										input.value = '';
-									}
-								}}
-							>
-								<Input
-									name="new-todo"
-									placeholder="Add a todo..."
-									class="h-8 flex-1 text-xs"
-								/>
-								<Button type="submit" variant="outline" size="sm" class="text-xs">
-									<PlusIcon class="mr-1 size-3" />
-									Add
-								</Button>
-							</form>
 						{/if}
 					</div>
 				</ScrollArea.Root>

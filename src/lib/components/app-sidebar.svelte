@@ -12,7 +12,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import ModeToggle from "$lib/components/mode-toggle.svelte";
 
-	import { ganttStore } from "$lib/stores/gantt/index.js";
+	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { projectStore } from "$lib/stores/project/index.js";
 	import { persistenceStore } from "$lib/stores/persistence/index.js";
 	import type { RecentEntry } from "$lib/stores/persistence/index.js";

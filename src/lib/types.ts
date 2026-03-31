@@ -26,6 +26,8 @@ export interface GanttNode {
   dependencies: Dependency[];
   todos: Todo[];
   kanbanColumnId: string;
+  /** When true, this task (and its children) won't appear in Up Next until all dependency predecessors reach 100% progress. */
+  requireDepsComplete?: boolean;
 }
 
 export interface Project {
@@ -38,6 +40,8 @@ export interface Project {
 
 export interface Dependency {
   targetId: string;
+  /** Denormalized name for human/LLM readability in the JSON file. Ignored by app logic. */
+  targetName?: string;
   type: DependencyType;
   lag: number;
 }

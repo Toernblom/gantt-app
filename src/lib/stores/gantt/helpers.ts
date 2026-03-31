@@ -1,5 +1,15 @@
 import type { GanttNode, GanttRow, Dependency } from '$lib/types';
 
+/** Get effective progress: auto from todos if present, otherwise manual. */
+function effectiveProgress(node: GanttNode): number {
+  if (node.children.length > 0) return computeProgress(node);
+  if (node.todos && node.todos.length > 0) {
+    const done = node.todos.filter(t => t.done).length;
+    return Math.round((done / node.todos.length) * 100);
+  }
+  return node.progress;
+}
+
 export function flattenNodes(nodes: GanttNode[], baseLevel = 0): GanttRow[] {
   const rows: GanttRow[] = [];
   for (const node of nodes) {
@@ -9,7 +19,7 @@ export function flattenNodes(nodes: GanttNode[], baseLevel = 0): GanttRow[] {
       level: baseLevel,
       startDate: node.startDate,
       endDate: node.endDate,
-      progress: node.progress,
+      progress: effectiveProgress(node),
       color: node.color,
       isMilestone: node.isMilestone,
       hasChildren: node.children.length > 0,
@@ -117,8 +127,16 @@ export function computeRowContexts(rows: GanttRow[]): { guides: boolean[]; isLas
  * Returns the computed progress for the given node.
  */
 export function computeProgress(node: GanttNode): number {
-  if (node.children.length === 0) return node.progress;
+  // Leaf with todos: auto-calculate from todo completion
+  if (node.children.length === 0) {
+    if (node.todos && node.todos.length > 0) {
+      const done = node.todos.filter(t => t.done).length;
+      return Math.round((done / node.todos.length) * 100);
+    }
+    return node.progress; // manual
+  }
 
+  // Parent: weighted average of children
   let totalWeight = 0;
   let weightedSum = 0;
   for (const child of node.children) {
@@ -142,7 +160,8 @@ export function computeCriticalPath(nodes: GanttNode[]): Set<string> {
   const allNodes: GanttNode[] = [];
   const collect = (list: GanttNode[]) => {
     for (const n of list) {
-      allNodes.push(n);
+      // Only include leaf tasks — parents/epics are containers, not work items
+      if (n.children.length === 0) allNodes.push(n);
       collect(n.children);
     }
   };

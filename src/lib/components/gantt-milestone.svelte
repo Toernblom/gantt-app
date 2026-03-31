@@ -2,8 +2,8 @@
 	import type { ScaleTime } from 'd3-scale';
 	import type { GanttRow } from '$lib/types';
 	import { ROW_HEIGHT } from '$lib/types';
-	import { ganttStore } from '$lib/stores/gantt/index.js';
-	import { interactionStore } from '$lib/stores/interaction/index.js';
+	import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
+	import { interactionStore } from '$lib/stores/interaction/interactionStore.svelte.js';
 	import { roundDate, toLocalIso } from '$lib/utils/timeline';
 
 	interface Props {
@@ -45,6 +45,39 @@
 	// Drag-to-move handlers
 	// -------------------------------------------------------------------------
 
+	// Long-press for dependency linking
+	const HOLD_MS = 500;
+	const MOVE_PX = 4;
+	let holdTimer: ReturnType<typeof setTimeout> | null = null;
+	let holdClientX = 0;
+	let holdClientY = 0;
+	let holdFired = false;
+
+	function clearHold() { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } }
+
+	function onHoldMove(e: MouseEvent) {
+		if (Math.abs(e.clientX - holdClientX) > MOVE_PX || Math.abs(e.clientY - holdClientY) > MOVE_PX) {
+			clearHold();
+			window.removeEventListener('mousemove', onHoldMove);
+			window.removeEventListener('mouseup', onHoldUp);
+			if (!holdFired) {
+				isDragging = true;
+				dragStartX = holdClientX;
+				dragOriginalDate = row.startDate;
+				dragOffsetX = 0;
+				document.body.style.userSelect = 'none';
+				window.addEventListener('mousemove', handleDragMove);
+				window.addEventListener('mouseup', handleDragEnd);
+			}
+		}
+	}
+
+	function onHoldUp() {
+		clearHold();
+		window.removeEventListener('mousemove', onHoldMove);
+		window.removeEventListener('mouseup', onHoldUp);
+	}
+
 	function handleDragStart(e: MouseEvent) {
 		if (e.button !== 0) return;
 		e.preventDefault();
@@ -52,25 +85,23 @@
 
 		if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
 
-		// Shift+click: start dependency link
-		if (e.shiftKey) {
+		// If in link mode, don't start a new drag — mouseup handles completion
+		if (interactionStore.isLinking) return;
+
+		holdClientX = e.clientX;
+		holdClientY = e.clientY;
+		holdFired = false;
+
+		holdTimer = setTimeout(() => {
+			holdFired = true;
+			window.removeEventListener('mousemove', onHoldMove);
+			window.removeEventListener('mouseup', onHoldUp);
 			const anchorY = rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 			interactionStore.startLink(row.id, cx, anchorY, e);
-			return;
-		}
+		}, HOLD_MS);
 
-		// If in link mode, complete the link
-		if (interactionStore.handleBarClick(row.id)) return;
-
-		isDragging = true;
-		dragStartX = e.clientX;
-		dragOriginalDate = row.startDate;
-		dragOffsetX = 0;
-
-		document.body.style.userSelect = 'none';
-
-		window.addEventListener('mousemove', handleDragMove);
-		window.addEventListener('mouseup', handleDragEnd);
+		window.addEventListener('mousemove', onHoldMove);
+		window.addEventListener('mouseup', onHoldUp);
 	}
 
 	function handleDragMove(e: MouseEvent) {
@@ -107,9 +138,13 @@
 	// Click / double-click handlers
 	// -------------------------------------------------------------------------
 
+	function handleMouseUp() {
+		interactionStore.handleBarMouseUp(row.id);
+	}
+
 	function handleClick() {
 		if (isDragging) return;
-		if (interactionStore.handleBarClick(row.id)) return;
+		if (interactionStore.isLinking) return;
 		if (clickTimer) return;
 		clickTimer = setTimeout(() => {
 			ganttStore.selectTask(row.id);
@@ -137,7 +172,9 @@
 	// Derived cursor
 	// -------------------------------------------------------------------------
 
-	let gCursor = $derived(isDragging ? 'grabbing' : 'grab');
+	let gCursor = $derived(
+		interactionStore.isLinking ? 'crosshair' : isDragging ? 'grabbing' : 'grab'
+	);
 
 	// -------------------------------------------------------------------------
 	// Tooltip text
@@ -156,6 +193,7 @@
 	onclick={handleClick}
 	ondblclick={handleDoubleClick}
 	onmousedown={handleDragStart}
+	onmouseup={handleMouseUp}
 	onmouseenter={handleMouseEnter}
 	onmouseleave={handleMouseLeave}
 	style="cursor: {gCursor}; {isDragging ? `transform: translate(${dragOffsetX}px, 0)` : ''}"

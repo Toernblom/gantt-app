@@ -58,14 +58,14 @@
 					<Select.Root type="single" bind:value={dialogStore.selectedEpicId}>
 						<Select.Trigger class="w-full">
 							{#if dialogStore.selectedEpicId}
-								{@const epic = dialogStore.epicOptions.find((e) => e.id === dialogStore.selectedEpicId)}
-								{#if epic}
+								{@const match = dialogStore.allParentOptions.find((o) => o.node.id === dialogStore.selectedEpicId)}
+								{#if match}
 									<span class="flex items-center gap-2">
 										<span
 											class="size-2.5 shrink-0 rounded-full"
-											style="background-color: {epic.color}"
+											style="background-color: {match.node.color}"
 										></span>
-										{epic.name}
+										{match.node.name}
 									</span>
 								{:else}
 									None (top level)
@@ -74,21 +74,21 @@
 								None (top level)
 							{/if}
 						</Select.Trigger>
-						<Select.Content>
+						<Select.Content class="max-h-60">
 							<Select.Item value="">
 								<span class="text-muted-foreground">None (top level)</span>
 							</Select.Item>
-							{#if dialogStore.epicOptions.length > 0}
+							{#if dialogStore.allParentOptions.length > 0}
 								<Separator class="my-1" />
 							{/if}
-							{#each dialogStore.epicOptions as epic (epic.id)}
-								<Select.Item value={epic.id}>
-									<span class="flex items-center gap-2">
+							{#each dialogStore.allParentOptions as option (option.node.id)}
+								<Select.Item value={option.node.id}>
+									<span class="flex items-center gap-2" style="padding-left: {option.depth * 12}px;">
 										<span
 											class="size-2.5 shrink-0 rounded-full"
-											style="background-color: {epic.color}"
+											style="background-color: {option.node.color}"
 										></span>
-										{epic.name}
+										{option.node.name}
 									</span>
 								</Select.Item>
 							{/each}

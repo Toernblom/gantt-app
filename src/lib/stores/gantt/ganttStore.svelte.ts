@@ -3,7 +3,7 @@ import { ZOOM_CONFIGS } from '$lib/types';
 import { projectStore } from '../project/index.js';
 import { persistenceStore } from '../persistence/index.js';
 import { historyStore } from '../history/index.js';
-import { interactionStore } from '../interaction/index.js';
+import { interactionStore } from '../interaction/interactionStore.svelte.js';
 import type { RecentEntry } from '../persistence/index.js';
 import {
   flattenNodes,

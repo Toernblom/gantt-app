@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { GanttNode } from '$lib/types';
-  import { ganttStore } from '$lib/stores/gantt/index.js';
+  import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
   import { kanbanStore } from '$lib/stores/kanban/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Progress } from '$lib/components/ui/progress/index.js';
@@ -15,6 +15,7 @@
   let todoCount = $derived(task.todos?.length ?? 0);
   let todoDone = $derived(task.todos?.filter(t => t.done).length ?? 0);
   let hasTodos = $derived(todoCount > 0);
+  let effectiveProgress = $derived(ganttStore.getEffectiveProgress(task.id));
 
   function handleClick() {
     ganttStore.selectTask(task.id);
@@ -61,12 +62,10 @@
     </div>
   </div>
 
-  {#if task.progress > 0 || hasTodos}
+  {#if effectiveProgress > 0}
     <div class="mt-2 flex items-center gap-2">
-      {#if task.progress > 0}
-        <Progress value={task.progress} class="h-1.5 flex-1" />
-        <span class="text-[10px] tabular-nums text-muted-foreground">{task.progress}%</span>
-      {/if}
+      <Progress value={effectiveProgress} class="h-1.5 flex-1" />
+      <span class="text-[10px] tabular-nums text-muted-foreground">{effectiveProgress}%</span>
     </div>
   {/if}
 

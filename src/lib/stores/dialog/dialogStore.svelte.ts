@@ -1,4 +1,4 @@
-import { ganttStore } from '../gantt/index.js';
+import { ganttStore } from '../gantt/ganttStore.svelte.js';
 import type { GanttNode } from '$lib/types';
 import type { DateValue } from '@internationalized/date';
 import { CalendarDate, parseDate, today, getLocalTimeZone } from '@internationalized/date';
@@ -29,7 +29,18 @@ class DialogStore {
   readonly taskColors = TASK_COLORS;
 
   // --- Derived ---
-  epicOptions = $derived(ganttStore.displayChildren);
+  /** All nodes in the project tree (flattened), usable as parent options. */
+  allParentOptions = $derived.by<{ node: GanttNode; depth: number }[]>(() => {
+    const result: { node: GanttNode; depth: number }[] = [];
+    const walk = (nodes: GanttNode[], depth: number) => {
+      for (const n of nodes) {
+        result.push({ node: n, depth });
+        walk(n.children, depth + 1);
+      }
+    };
+    walk(ganttStore.displayChildren, 0);
+    return result;
+  });
 
   /** True when creating a sub-task under a specific parent (hide epic selector). */
   hasPresetParent = $derived(this.mode === 'create' && !!this.defaultEpicId);
@@ -92,10 +103,11 @@ class DialogStore {
 
   populateFromTask(task: GanttNode): void {
     this.taskName = task.name;
-    const ownerEpic = this.epicOptions.find((e) =>
-      e.children.some((t) => t.id === task.id),
+    // Find the parent that owns this task
+    const ownerOption = this.allParentOptions.find((o) =>
+      o.node.children.some((t) => t.id === task.id),
     );
-    this.selectedEpicId = ownerEpic?.id ?? this.epicOptions[0]?.id ?? '';
+    this.selectedEpicId = ownerOption?.node.id ?? '';
     this.startDateValue = this.isoToDateValue(task.startDate);
     this.endDateValue = this.isoToDateValue(task.endDate);
     this.isMilestone = task.isMilestone;

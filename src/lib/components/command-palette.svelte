@@ -5,7 +5,7 @@
 
   import * as Command from "$lib/components/ui/command/index.js";
 
-  import { ganttStore } from "$lib/stores/gantt/index.js";
+  import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
   import { dialogStore } from "$lib/stores/dialog/index.js";
   import { projectStore } from "$lib/stores/project/index.js";
   import type { GanttNode } from "$lib/types.js";
@@ -32,10 +32,14 @@
   let allTasks = $derived(collectAll(projectStore.project.children));
 
   function handleSelectTask(taskId: string) {
-    ganttStore.selectTask(taskId);
-    // If viewing kanban, switch to gantt so scroll-to-center works
-    if (ganttStore.viewMode === 'kanban') ganttStore.setViewMode('gantt');
     open = false;
+    // Switch to gantt if needed, then select after a tick so the chart mounts first
+    if (ganttStore.viewMode === 'kanban') ganttStore.setViewMode('gantt');
+    // Clear then re-set selection to retrigger the scroll-to-center $effect
+    ganttStore.selectTask(null);
+    requestAnimationFrame(() => {
+      ganttStore.selectTask(taskId);
+    });
   }
 </script>
 

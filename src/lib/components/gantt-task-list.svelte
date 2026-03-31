@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ganttStore } from '$lib/stores/gantt/index.js';
+	import { ganttStore } from '$lib/stores/gantt/ganttStore.svelte.js';
 	import GanttTaskRow from './gantt-task-row.svelte';
 </script>
 
