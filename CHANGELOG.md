@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8
+
+- Fixed "What's New" dialog not appearing after update
+- Changelog now fetched from GitHub release notes
+- Version change detection works reliably across reinstalls
+
 ## 0.1.7
 
 - Added "What's New" dialog after auto-update

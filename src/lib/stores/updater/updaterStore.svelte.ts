@@ -1,7 +1,6 @@
 import { isTauri } from '../persistence/isTauri.js';
 
-const PENDING_UPDATE_KEY = 'ganttapp_pending_update_version';
-const CHANGELOG_KEY = 'ganttapp_changelog';
+const LAST_SEEN_VERSION_KEY = 'ganttapp_last_seen_version';
 
 class UpdaterStore {
   available = $state(false);
@@ -10,11 +9,11 @@ class UpdaterStore {
   downloading = $state(false);
   error = $state<string | null>(null);
 
-  /** Set to true when the app just updated — drives the "What's New" dialog. */
+  /** Set to true when the app version changed since last launch — drives the "What's New" dialog. */
   showChangelog = $state(false);
   /** The version that was just installed. */
   updatedToVersion = $state<string | null>(null);
-  /** Release notes for the just-installed version. */
+  /** Release notes from the update (if available). */
   changelogBody = $state<string | null>(null);
 
   private _update: Awaited<ReturnType<typeof import('@tauri-apps/plugin-updater').check>> | null = null;
@@ -24,8 +23,8 @@ class UpdaterStore {
     this.checking = true;
     this.error = null;
     try {
-      // Check if we just rebooted after an update
-      this._checkPostUpdate();
+      // Detect version change (works even if installer clears nothing)
+      await this._detectVersionChange();
 
       const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
@@ -49,21 +48,10 @@ class UpdaterStore {
     this.downloading = true;
     this.error = null;
     try {
-      // Save version + notes before relaunch so we can show changelog after restart
-      if (this._update.version) {
-        localStorage.setItem(PENDING_UPDATE_KEY, this._update.version);
-        if (this._update.body) {
-          localStorage.setItem(CHANGELOG_KEY, this._update.body);
-        }
-      }
-
       await this._update.downloadAndInstall();
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (e) {
-      // Clear the pending flag if install failed
-      localStorage.removeItem(PENDING_UPDATE_KEY);
-      localStorage.removeItem(CHANGELOG_KEY);
       const msg = e instanceof Error ? e.message : String(e);
       console.error('Update install failed:', msg);
       this.error = msg;
@@ -79,19 +67,46 @@ class UpdaterStore {
     this.changelogBody = null;
   }
 
-  /** Check localStorage for a pending update flag left before relaunch. */
-  private _checkPostUpdate(): void {
+  /**
+   * Compare the running app version against the last seen version in localStorage.
+   * If different, the app was updated — show the changelog dialog.
+   * Works regardless of how the update was installed (auto-update, manual reinstall, etc.)
+   */
+  private async _detectVersionChange(): Promise<void> {
     try {
-      const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
-      if (pendingVersion) {
-        this.updatedToVersion = pendingVersion;
-        this.changelogBody = localStorage.getItem(CHANGELOG_KEY);
+      const { getVersion } = await import('@tauri-apps/api/app');
+      const currentVersion = await getVersion();
+      const lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
+
+      if (lastSeen && lastSeen !== currentVersion) {
+        // Version changed — show changelog
+        this.updatedToVersion = currentVersion;
         this.showChangelog = true;
-        localStorage.removeItem(PENDING_UPDATE_KEY);
-        localStorage.removeItem(CHANGELOG_KEY);
+        // Try to fetch release notes from GitHub
+        this._fetchReleaseNotes(currentVersion);
+      }
+
+      // Always update the stored version
+      localStorage.setItem(LAST_SEEN_VERSION_KEY, currentVersion);
+    } catch {
+      // Tauri API not available or localStorage error — ignore
+    }
+  }
+
+  /** Fetch release notes from the GitHub release for this version. */
+  private async _fetchReleaseNotes(version: string): Promise<void> {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/Toernblom/gantt-app/releases/tags/v${version}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.body) {
+          this.changelogBody = data.body;
+        }
       }
     } catch {
-      // localStorage not available — ignore
+      // Network error — changelog body stays null, dialog shows fallback text
     }
   }
 }

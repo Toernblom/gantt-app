@@ -14,15 +14,23 @@ Modern, local-first Gantt chart project management tool. No cloud, no subscripti
 - **Don't modify `src/lib/components/ui/`** — these are shadcn-svelte generated primitives.
 - **Theming:** Light/dark/system via `mode-watcher`. Default is dark. Toggle lives in the sidebar footer.
 
+## Releases
+
+- **Update `CHANGELOG.md`** before every release. Add a new `## X.Y.Z` section at the top with bullet points describing changes. This is the source of truth — the GitHub Actions workflow extracts it for release notes, and the app shows it in the "What's New" dialog after auto-update.
+- **Bump version** in `src-tauri/tauri.conf.json` only (not Cargo.toml — that stays at `0.0.0` to keep the Rust build cache stable).
+- **Tag and push:** `git tag vX.Y.Z && git push origin vX.Y.Z` triggers the release workflow.
+
 ## Commands
 
 ```bash
-npm run dev       # Start dev server
+npm run dev       # Start dev server (browser only, no Tauri)
 npm run build     # Production build
 npm run check     # TypeScript + Svelte type checking
 npm run preview   # Preview production build
+npm run tauri:dev # Start Tauri desktop app (requires Rust)
+npm run tauri:build # Build Windows installer
 ```
 
 ## Tech Stack
 
-SvelteKit 2, Svelte 5 (runes), TypeScript (strict), Tailwind CSS 4, shadcn-svelte, d3-scale, paneforge (resizable panes).
+SvelteKit 2, Svelte 5 (runes), TypeScript (strict), Tailwind CSS 4, shadcn-svelte, d3-scale, paneforge (resizable panes), Tauri v2 (desktop shell, auto-updater, file system).
