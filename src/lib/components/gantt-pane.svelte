@@ -56,7 +56,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 
-		{#if persistenceStore.activeDirHandle}
+		{#if persistenceStore.activeDirPath}
 			<span class="text-xs text-muted-foreground/60">
 				{#if persistenceStore.isSaving}
 					Saving...
@@ -68,7 +68,7 @@
 			</span>
 		{/if}
 
-		{#if !persistenceStore.activeDirHandle}
+		{#if !persistenceStore.activeDirPath}
 			<span class="text-xs text-muted-foreground/50">Demo Project</span>
 		{/if}
 

@@ -1,18 +1,11 @@
+import { readTextFile, writeTextFile, exists } from '@tauri-apps/plugin-fs';
+import { open } from '@tauri-apps/plugin-dialog';
+import { join } from '@tauri-apps/api/path';
 import type { Project } from '$lib/types';
 
 const MARKER_FILE = '.ganttapp';
 const PROJECT_FILE = 'project.json';
 const MARKER_VERSION = 1;
-
-/** Check if a directory contains a .ganttapp marker. */
-export async function isGanttProject(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
-  try {
-    await dirHandle.getFileHandle(MARKER_FILE);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** Normalize dependency type strings that LLMs or humans may write longhand. */
 const DEP_TYPE_ALIASES: Record<string, string> = {
@@ -27,16 +20,14 @@ function normalizeDependencyType(type: string): 'FS' | 'SS' | 'FF' | 'SF' {
   const alias = DEP_TYPE_ALIASES[type.toLowerCase()];
   if (alias) return alias as 'FS' | 'SS' | 'FF' | 'SF';
   if (['FS', 'SS', 'FF', 'SF'].includes(type)) return type as 'FS' | 'SS' | 'FF' | 'SF';
-  return 'FS'; // Unknown → default to finish-to-start
+  return 'FS';
 }
 
 /** Apply defaults for fields added in newer schema versions (forward-compat migration). */
 function migrateProject(project: Project): Project {
-  // Ensure kanbanColumns exists
   if (!project.kanbanColumns) {
     project.kanbanColumns = [{ id: 'backlog', name: 'Backlog' }];
   }
-  // Ensure every node has todos, kanbanColumnId, and valid dependency types
   function migrateNode(node: Project['children'][number]): void {
     if (!node.todos) node.todos = [];
     if (!node.kanbanColumnId) node.kanbanColumnId = 'backlog';
@@ -54,43 +45,41 @@ function migrateProject(project: Project): Project {
   return project;
 }
 
+/** Check if a directory contains a .ganttapp marker. */
+export async function isGanttProject(dirPath: string): Promise<boolean> {
+  const markerPath = await join(dirPath, MARKER_FILE);
+  return exists(markerPath);
+}
+
 /** Read and parse project.json from a directory. */
-export async function readProject(dirHandle: FileSystemDirectoryHandle): Promise<Project> {
-  const fileHandle = await dirHandle.getFileHandle(PROJECT_FILE);
-  const file = await fileHandle.getFile();
-  const text = await file.text();
+export async function readProject(dirPath: string): Promise<Project> {
+  const filePath = await join(dirPath, PROJECT_FILE);
+  const text = await readTextFile(filePath);
   return migrateProject(JSON.parse(text) as Project);
 }
 
 /** Write project data as pretty-printed JSON. */
-export async function writeProject(dirHandle: FileSystemDirectoryHandle, project: Project): Promise<void> {
-  const fileHandle = await dirHandle.getFileHandle(PROJECT_FILE, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(JSON.stringify(project, null, 2));
-  await writable.close();
+export async function writeProject(dirPath: string, project: Project): Promise<void> {
+  const filePath = await join(dirPath, PROJECT_FILE);
+  await writeTextFile(filePath, JSON.stringify(project, null, 2));
 }
 
 /** Write the .ganttapp marker file. */
-export async function writeMarker(dirHandle: FileSystemDirectoryHandle): Promise<void> {
-  const fileHandle = await dirHandle.getFileHandle(MARKER_FILE, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(JSON.stringify({ version: MARKER_VERSION, createdAt: new Date().toISOString().slice(0, 10) }, null, 2));
-  await writable.close();
+export async function writeMarker(dirPath: string): Promise<void> {
+  const markerPath = await join(dirPath, MARKER_FILE);
+  await writeTextFile(markerPath, JSON.stringify({
+    version: MARKER_VERSION,
+    createdAt: new Date().toISOString().slice(0, 10),
+  }, null, 2));
 }
 
 /** Open directory picker. Returns null if user cancels. */
-export async function pickProjectFolder(): Promise<FileSystemDirectoryHandle | null> {
-  try {
-    return await window.showDirectoryPicker({ mode: 'readwrite' });
-  } catch {
-    return null;
-  }
+export async function pickProjectFolder(): Promise<string | null> {
+  const selected = await open({ directory: true, multiple: false });
+  return selected;
 }
 
-/** Request readwrite permission on a stored handle. */
-export async function verifyPermission(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
-  const opts = { mode: 'readwrite' as FileSystemPermissionMode };
-  if ((await dirHandle.queryPermission(opts)) === 'granted') return true;
-  if ((await dirHandle.requestPermission(opts)) === 'granted') return true;
-  return false;
+/** Get the full path to project.json for a given directory (for file watching). */
+export async function getProjectFilePath(dirPath: string): Promise<string> {
+  return join(dirPath, PROJECT_FILE);
 }

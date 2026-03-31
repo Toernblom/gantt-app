@@ -1,56 +1,58 @@
-const DB_NAME = 'ganttapp';
-const DB_VERSION = 1;
-const STORE_NAME = 'recent-projects';
+import { readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
+import { appDataDir, join } from '@tauri-apps/api/path';
+
+const RECENTS_FILE = 'recent-projects.json';
 
 export interface RecentEntry {
   id: string;
   name: string;
   lastOpened: string;
-  dirHandle: FileSystemDirectoryHandle;
+  /** Absolute path to the project directory on disk. */
+  dirPath: string;
 }
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+async function getRecentsPath(): Promise<string> {
+  const appDir = await appDataDir();
+  // Ensure the app data directory exists
+  if (!(await exists(appDir))) {
+    await mkdir(appDir, { recursive: true });
+  }
+  return join(appDir, RECENTS_FILE);
+}
+
+async function readRecents(): Promise<RecentEntry[]> {
+  const path = await getRecentsPath();
+  if (!(await exists(path))) return [];
+  try {
+    const text = await readTextFile(path);
+    return JSON.parse(text) as RecentEntry[];
+  } catch {
+    return [];
+  }
+}
+
+async function writeRecents(entries: RecentEntry[]): Promise<void> {
+  const path = await getRecentsPath();
+  await writeTextFile(path, JSON.stringify(entries, null, 2));
 }
 
 export async function getRecentProjects(): Promise<RecentEntry[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () => {
-      resolve((req.result as RecentEntry[]).sort((a, b) => b.lastOpened.localeCompare(a.lastOpened)));
-    };
-    req.onerror = () => reject(req.error);
-  });
+  const entries = await readRecents();
+  return entries.sort((a, b) => b.lastOpened.localeCompare(a.lastOpened));
 }
 
 export async function saveRecentProject(entry: RecentEntry): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(entry);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const entries = await readRecents();
+  const idx = entries.findIndex(e => e.id === entry.id);
+  if (idx !== -1) {
+    entries[idx] = entry;
+  } else {
+    entries.push(entry);
+  }
+  await writeRecents(entries);
 }
 
 export async function removeRecentProject(id: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const entries = await readRecents();
+  await writeRecents(entries.filter(e => e.id !== id));
 }

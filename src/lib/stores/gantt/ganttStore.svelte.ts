@@ -3,6 +3,7 @@ import { ZOOM_CONFIGS } from '$lib/types';
 import { projectStore } from '../project/index.js';
 import { persistenceStore } from '../persistence/index.js';
 import { historyStore } from '../history/index.js';
+import { interactionStore } from '../interaction/index.js';
 import type { RecentEntry } from '../persistence/index.js';
 import {
   flattenNodes,
@@ -17,6 +18,7 @@ import {
   computeCriticalPath,
 } from './helpers.js';
 import type { BreadcrumbEntry, RowContext, DependencyPair, ResolvedDependency } from './models.js';
+import { isTauri } from '../persistence/isTauri.js';
 
 class GanttStore {
   // --- Core state ---
@@ -123,12 +125,18 @@ class GanttStore {
    * Leaf nodes keep their manual progress; parents aggregate from children.
    * Components should read from this for display rather than node.progress for parents.
    */
-  parentProgress = $derived.by<Map<string, number>>(() => {
+  autoProgress = $derived.by<Map<string, number>>(() => {
     const map = new Map<string, number>();
     const walk = (nodes: GanttNode[]) => {
       for (const node of nodes) {
+        // Parents: always auto from children
         if (node.children.length > 0) {
           map.set(node.id, computeProgress(node));
+        }
+        // Leaves with todos: auto from todo completion
+        else if (node.todos && node.todos.length > 0) {
+          const done = node.todos.filter(t => t.done).length;
+          map.set(node.id, Math.round((done / node.todos.length) * 100));
         }
         walk(node.children);
       }
@@ -137,9 +145,14 @@ class GanttStore {
     return map;
   });
 
-  /** Get the effective progress for any node (auto-calculated for parents, manual for leaves). */
+  /** Get the effective progress for any node. Auto if it has children or todos, manual otherwise. */
   getEffectiveProgress(id: string): number {
-    return this.parentProgress.get(id) ?? (this.getNodeById(id)?.progress ?? 0);
+    return this.autoProgress.get(id) ?? (this.getNodeById(id)?.progress ?? 0);
+  }
+
+  /** Whether a node's progress is auto-calculated (has children or has todos). */
+  isAutoProgress(id: string): boolean {
+    return this.autoProgress.has(id);
   }
 
   // --- Methods: task tree ---
@@ -150,7 +163,33 @@ class GanttStore {
   }
 
   selectTask(id: string | null): void {
+    if (id) {
+      // Expand all ancestors so the task is visible in the row list
+      this._expandAncestors(id);
+      interactionStore.clearDependencySelection();
+    }
     this.selectedTaskId = id;
+  }
+
+  /** Walk the tree to find the path to a node, and expand every ancestor along the way. */
+  private _expandAncestors(targetId: string): void {
+    const path: GanttNode[] = [];
+    const find = (nodes: GanttNode[], trail: GanttNode[]): boolean => {
+      for (const node of nodes) {
+        if (node.id === targetId) {
+          path.push(...trail);
+          return true;
+        }
+        if (node.children.length > 0 && find(node.children, [...trail, node])) {
+          return true;
+        }
+      }
+      return false;
+    };
+    find(this.displayChildren, []);
+    for (const ancestor of path) {
+      if (!ancestor.expanded) ancestor.expanded = true;
+    }
   }
 
   setZoom(level: ZoomLevel): void {
@@ -361,8 +400,11 @@ class GanttStore {
       }
       case 'Delete':
       case 'Backspace': {
-        if (currentId) {
-          e.preventDefault();
+        e.preventDefault();
+        // Delete selected dependency first, then selected task
+        if (interactionStore.selectedDep) {
+          interactionStore.deleteSelectedDependency();
+        } else if (currentId) {
           this.deleteTask(currentId);
         }
         break;
@@ -394,8 +436,14 @@ class GanttStore {
 
 export const ganttStore = new GanttStore();
 
-// Load recent projects from IndexedDB on startup, and auto-open the first one
-if (typeof window !== 'undefined') {
+// Load recent projects on startup, auto-open the first one, and wire external reload
+if (typeof window !== 'undefined' && isTauri) {
+  // Wire up external file change handler
+  persistenceStore.onExternalChange = (project) => {
+    projectStore.loadProject(project);
+    // Don't clear focusPath/selection — preserve UI state on external reload
+  };
+
   persistenceStore.loadRecents().then(() => {
     const recents = persistenceStore.recentProjects;
     if (recents.length > 0) {
