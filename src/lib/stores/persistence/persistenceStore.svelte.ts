@@ -1,14 +1,31 @@
 import type { Project } from '$lib/types';
+import { isTauri } from './isTauri.js';
+
+// Tauri imports (used only when isTauri)
 import {
-  isGanttProject, readProject, writeProject, writeMarker,
-  pickProjectFolder, getProjectFilePath,
+  isGanttProject as isGanttProjectTauri,
+  readProject as readProjectTauri,
+  writeProject as writeProjectTauri,
+  writeMarker as writeMarkerTauri,
+  pickProjectFolder as pickProjectFolderTauri,
+  getProjectFilePath,
 } from './fileSystem.js';
 import {
   getRecentProjects, saveRecentProject, removeRecentProject,
   type RecentEntry,
 } from './recentProjects.js';
-import { watch, type UnwatchFn } from '@tauri-apps/plugin-fs';
-import { isTauri } from './isTauri.js';
+
+// Browser imports
+import {
+  isGanttProjectBrowser,
+  readProjectBrowser,
+  writeProjectBrowser,
+  writeMarkerBrowser,
+  pickProjectFolderBrowser,
+  verifyPermission,
+  getActiveDirHandle,
+  setActiveDirHandle,
+} from './fileSystemBrowser.js';
 
 class PersistenceStore {
   recentProjects = $state<RecentEntry[]>([]);
@@ -17,30 +34,40 @@ class PersistenceStore {
   lastSaved = $state<string | null>(null);
   error = $state<string | null>(null);
 
+  /** True when running in a browser with File System Access API support. */
+  isBrowserFS = !isTauri && typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
   /** Callback invoked when an external file change is detected. Set by ganttStore. */
   onExternalChange: ((project: Project) => void) | null = null;
 
-  // Debounced auto-save
   private _saveTimer: ReturnType<typeof setTimeout> | null = null;
-  // File watcher cleanup
-  private _unwatchFn: UnwatchFn | null = null;
-  // Write guard: timestamp of our last write, used to suppress watcher reload
+  private _unwatchFn: (() => Promise<void>) | null = null;
   private _lastWriteTime = 0;
   private static readonly WRITE_GUARD_MS = 2000;
 
   scheduleSave(project: Project): void {
-    if (!isTauri || !this.activeDirPath) return;
+    if (isTauri) {
+      if (!this.activeDirPath) return;
+    } else if (this.isBrowserFS) {
+      if (!getActiveDirHandle()) return;
+    } else {
+      return;
+    }
     if (this._saveTimer) clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this._doSave(project), 500);
   }
 
   private async _doSave(project: Project): Promise<void> {
-    if (!this.activeDirPath) return;
     this.isSaving = true;
     this.error = null;
     try {
       this._lastWriteTime = Date.now();
-      await writeProject(this.activeDirPath, project);
+      if (isTauri && this.activeDirPath) {
+        await writeProjectTauri(this.activeDirPath, project);
+      } else if (this.isBrowserFS) {
+        const handle = getActiveDirHandle();
+        if (handle) await writeProjectBrowser(handle, project);
+      }
       this.lastSaved = new Date().toISOString();
     } catch (e) {
       this.error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -64,36 +91,24 @@ class PersistenceStore {
   }
 
   async openFolder(): Promise<Project | null> {
-    if (!isTauri) return null;
-    const dirPath = await pickProjectFolder();
-    if (!dirPath) return null;
-    if (!(await isGanttProject(dirPath))) {
-      this.error = 'Not a Gantt App project (missing .ganttapp file)';
-      return null;
+    if (isTauri) {
+      return this._openFolderTauri();
+    } else if (this.isBrowserFS) {
+      return this._openFolderBrowser();
     }
-    try {
-      const project = await readProject(dirPath);
-      await this._setActiveDir(dirPath);
-      this.error = null;
-      await saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath });
-      await this.loadRecents();
-      return project;
-    } catch (e) {
-      this.error = `Failed to read project: ${e instanceof Error ? e.message : String(e)}`;
-      return null;
-    }
+    return null;
   }
 
   async openRecent(entry: RecentEntry): Promise<Project | null> {
     if (!isTauri) return null;
-    if (!(await isGanttProject(entry.dirPath))) {
+    if (!(await isGanttProjectTauri(entry.dirPath))) {
       this.error = 'Folder is no longer a valid project';
       await removeRecentProject(entry.id);
       await this.loadRecents();
       return null;
     }
     try {
-      const project = await readProject(entry.dirPath);
+      const project = await readProjectTauri(entry.dirPath);
       await this._setActiveDir(entry.dirPath);
       this.error = null;
       await saveRecentProject({ ...entry, lastOpened: new Date().toISOString() });
@@ -106,10 +121,46 @@ class PersistenceStore {
   }
 
   async createInFolder(): Promise<Project | null> {
-    if (!isTauri) return null;
-    const dirPath = await pickProjectFolder();
+    if (isTauri) {
+      return this._createInFolderTauri();
+    } else if (this.isBrowserFS) {
+      return this._createInFolderBrowser();
+    }
+    return null;
+  }
+
+  async forgetRecent(id: string): Promise<void> {
+    if (!isTauri) return;
+    await removeRecentProject(id);
+    await this.loadRecents();
+  }
+
+  // ---- Tauri implementations ----
+
+  private async _openFolderTauri(): Promise<Project | null> {
+    const dirPath = await pickProjectFolderTauri();
     if (!dirPath) return null;
-    if (await isGanttProject(dirPath)) {
+    if (!(await isGanttProjectTauri(dirPath))) {
+      this.error = 'Not a Gantt App project (missing .ganttapp file)';
+      return null;
+    }
+    try {
+      const project = await readProjectTauri(dirPath);
+      await this._setActiveDir(dirPath);
+      this.error = null;
+      await saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath });
+      await this.loadRecents();
+      return project;
+    } catch (e) {
+      this.error = `Failed to read project: ${e instanceof Error ? e.message : String(e)}`;
+      return null;
+    }
+  }
+
+  private async _createInFolderTauri(): Promise<Project | null> {
+    const dirPath = await pickProjectFolderTauri();
+    if (!dirPath) return null;
+    if (await isGanttProjectTauri(dirPath)) {
       this.error = 'This folder already contains a Gantt App project';
       return null;
     }
@@ -121,9 +172,9 @@ class PersistenceStore {
       kanbanColumns: [{ id: 'backlog', name: 'Backlog' }],
     };
     try {
-      await writeMarker(dirPath);
+      await writeMarkerTauri(dirPath);
       this._lastWriteTime = Date.now();
-      await writeProject(dirPath, project);
+      await writeProjectTauri(dirPath, project);
       await this._setActiveDir(dirPath);
       this.error = null;
       await saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath });
@@ -135,38 +186,84 @@ class PersistenceStore {
     }
   }
 
-  async forgetRecent(id: string): Promise<void> {
-    if (!isTauri) return;
-    await removeRecentProject(id);
-    await this.loadRecents();
+  // ---- Browser implementations ----
+
+  private async _openFolderBrowser(): Promise<Project | null> {
+    const dirHandle = await pickProjectFolderBrowser();
+    if (!dirHandle) return null;
+    if (!(await verifyPermission(dirHandle))) {
+      this.error = 'Permission denied';
+      return null;
+    }
+    if (!(await isGanttProjectBrowser(dirHandle))) {
+      this.error = 'Not a Gantt App project (missing .ganttapp file)';
+      return null;
+    }
+    try {
+      const project = await readProjectBrowser(dirHandle);
+      setActiveDirHandle(dirHandle);
+      this.activeDirPath = dirHandle.name;
+      this.error = null;
+      return project;
+    } catch (e) {
+      this.error = `Failed to read project: ${e instanceof Error ? e.message : String(e)}`;
+      return null;
+    }
   }
 
-  // ---- File Watcher ----
+  private async _createInFolderBrowser(): Promise<Project | null> {
+    const dirHandle = await pickProjectFolderBrowser();
+    if (!dirHandle) return null;
+    if (!(await verifyPermission(dirHandle))) {
+      this.error = 'Permission denied';
+      return null;
+    }
+    if (await isGanttProjectBrowser(dirHandle)) {
+      this.error = 'This folder already contains a Gantt App project';
+      return null;
+    }
+    const project: Project = {
+      id: `proj-${Date.now()}`,
+      name: dirHandle.name,
+      description: '',
+      children: [],
+      kanbanColumns: [{ id: 'backlog', name: 'Backlog' }],
+    };
+    try {
+      await writeMarkerBrowser(dirHandle);
+      await writeProjectBrowser(dirHandle, project);
+      setActiveDirHandle(dirHandle);
+      this.activeDirPath = dirHandle.name;
+      this.error = null;
+      return project;
+    } catch (e) {
+      this.error = `Failed to create project: ${e instanceof Error ? e.message : String(e)}`;
+      return null;
+    }
+  }
 
-  /** Start watching project.json in the active directory for external changes. */
+  // ---- File Watcher (Tauri only) ----
+
   private async _startWatching(dirPath: string): Promise<void> {
     await this._stopWatching();
     if (!isTauri) return;
     const projectFilePath = await getProjectFilePath(dirPath);
-    this._unwatchFn = await watch(projectFilePath, async (event) => {
-      // Only react to modify events
+    const { watch } = await import('@tauri-apps/plugin-fs');
+    const unwatchFn = await watch(projectFilePath, async (event) => {
       if (!event.type || typeof event.type !== 'object') return;
       const eventType = Object.keys(event.type)[0];
       if (eventType !== 'modify') return;
-
-      // Write guard: ignore changes we just wrote ourselves
       if (Date.now() - this._lastWriteTime < PersistenceStore.WRITE_GUARD_MS) return;
-
-      // External change detected — reload
       try {
-        const project = await readProject(dirPath);
+        const project = await readProjectTauri(dirPath);
         if (this.onExternalChange) {
           this.onExternalChange(project);
         }
       } catch {
-        // File might be mid-write by another process, ignore transient errors
+        // File might be mid-write, ignore
       }
     }, { recursive: false });
+    this._unwatchFn = async () => { await unwatchFn(); };
   }
 
   private async _stopWatching(): Promise<void> {
@@ -176,10 +273,8 @@ class PersistenceStore {
     }
   }
 
-  /** Set the active directory and start the file watcher. */
   private async _setActiveDir(dirPath: string): Promise<void> {
     this.activeDirPath = dirPath;
-    // Start watcher in background — don't let failure block project open
     this._startWatching(dirPath).catch(() => {});
   }
 }

@@ -437,17 +437,18 @@ class GanttStore {
 export const ganttStore = new GanttStore();
 
 // Load recent projects on startup, auto-open the first one, and wire external reload
-if (typeof window !== 'undefined' && isTauri) {
-  // Wire up external file change handler
+if (typeof window !== 'undefined') {
+  // Wire up external file change handler (Tauri only, but safe to set always)
   persistenceStore.onExternalChange = (project) => {
     projectStore.loadProject(project);
-    // Don't clear focusPath/selection — preserve UI state on external reload
   };
 
-  persistenceStore.loadRecents().then(() => {
-    const recents = persistenceStore.recentProjects;
-    if (recents.length > 0) {
-      ganttStore.openRecent(recents[0]);
-    }
-  });
+  if (isTauri) {
+    persistenceStore.loadRecents().then(() => {
+      const recents = persistenceStore.recentProjects;
+      if (recents.length > 0) {
+        ganttStore.openRecent(recents[0]);
+      }
+    });
+  }
 }
