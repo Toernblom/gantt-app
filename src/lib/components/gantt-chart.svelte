@@ -3,7 +3,7 @@
 	import GanttTimeline from "./gantt-timeline.svelte";
 	import GanttHeader from "./gantt-header.svelte";
 
-	import { TASK_LIST_WIDTH } from "$lib/types.js";
+	import { TASK_LIST_WIDTH, ROW_HEIGHT } from "$lib/types.js";
 	import { ganttStore } from "$lib/stores/gantt/index.js";
 	import { timelineStore } from "$lib/stores/timeline/index.js";
 	import LayoutGridIcon from "@tabler/icons-svelte/icons/layout-grid";
@@ -11,7 +11,7 @@
 	const HEADER_HEIGHT = 64;
 
 	// -------------------------------------------------------------------------
-	// Scroll-into-view on selection
+	// Scroll to center selected task (both axes)
 	// -------------------------------------------------------------------------
 
 	let scrollEl = $state<HTMLDivElement | undefined>(undefined);
@@ -19,10 +19,29 @@
 	$effect(() => {
 		const id = ganttStore.selectedTaskId;
 		if (!id || !scrollEl) return;
-		const rowEl = scrollEl.querySelector(`[data-row-id="${id}"]`);
-		if (rowEl) {
-			rowEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-		}
+
+		const rowIndex = ganttStore.rows.findIndex(r => r.id === id);
+		if (rowIndex === -1) return;
+
+		const row = ganttStore.rows[rowIndex];
+		const scale = timelineStore.timeScale;
+
+		// Vertical: center the row in the viewport
+		const rowTop = HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
+		const rowCenter = rowTop + ROW_HEIGHT / 2;
+		const targetScrollTop = rowCenter - scrollEl.clientHeight / 2;
+
+		// Horizontal: center the bar midpoint in the viewport
+		const barLeft = scale(new Date(row.startDate));
+		const barRight = scale(new Date(row.endDate));
+		const barCenter = TASK_LIST_WIDTH + (barLeft + barRight) / 2;
+		const targetScrollLeft = barCenter - scrollEl.clientWidth / 2;
+
+		scrollEl.scrollTo({
+			top: Math.max(0, targetScrollTop),
+			left: Math.max(0, targetScrollLeft),
+			behavior: 'smooth',
+		});
 	});
 </script>
 
