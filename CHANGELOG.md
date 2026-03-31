@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10
+
+- Faster CI builds (cached Rust compilation)
+- Browser fallback for local development (npm run dev)
+
 ## 0.1.9
 
 - "What's New" dialog now works on consecutive updates
