@@ -6,6 +6,7 @@ import {
   isGanttProject as isGanttProjectTauri,
   readProject as readProjectTauri,
   writeProject as writeProjectTauri,
+  writeLlmExport as writeLlmExportTauri,
   writeMarker as writeMarkerTauri,
   pickProjectFolder as pickProjectFolderTauri,
   getProjectFilePath,
@@ -20,12 +21,16 @@ import {
   isGanttProjectBrowser,
   readProjectBrowser,
   writeProjectBrowser,
+  writeLlmExportBrowser,
   writeMarkerBrowser,
   pickProjectFolderBrowser,
   verifyPermission,
   getActiveDirHandle,
   setActiveDirHandle,
 } from './fileSystemBrowser.js';
+
+import { buildLlmExport } from './llmExport.js';
+import { priorityStore } from '../priority/index.js';
 
 class PersistenceStore {
   recentProjects = $state<RecentEntry[]>([]);
@@ -62,11 +67,16 @@ class PersistenceStore {
     this.error = null;
     try {
       this._lastWriteTime = Date.now();
+      const llmData = buildLlmExport(project, priorityStore.readyItems, priorityStore.blockedItems);
       if (isTauri && this.activeDirPath) {
         await writeProjectTauri(this.activeDirPath, project);
+        await writeLlmExportTauri(this.activeDirPath, llmData);
       } else if (this.isBrowserFS) {
         const handle = getActiveDirHandle();
-        if (handle) await writeProjectBrowser(handle, project);
+        if (handle) {
+          await writeProjectBrowser(handle, project);
+          await writeLlmExportBrowser(handle, llmData);
+        }
       }
       this.lastSaved = new Date().toISOString();
     } catch (e) {

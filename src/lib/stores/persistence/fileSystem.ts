@@ -64,6 +64,13 @@ export async function writeProject(dirPath: string, project: Project): Promise<v
   await writeTextFile(filePath, JSON.stringify(project, null, 2));
 }
 
+const LLM_EXPORT_FILE = 'project_llm.json';
+
+export async function writeLlmExport(dirPath: string, data: object): Promise<void> {
+  const filePath = await join(dirPath, LLM_EXPORT_FILE);
+  await writeTextFile(filePath, JSON.stringify(data, null, 2));
+}
+
 /** Write the .ganttapp marker file. */
 export async function writeMarker(dirPath: string): Promise<void> {
   const markerPath = await join(dirPath, MARKER_FILE);

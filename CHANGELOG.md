@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.14
+
+- LLM project export: auto-generates `project_llm.json` alongside `project.json` on every save — lean, ID-free view with Up Next and Blocked sections
+- LLM export uses effective progress (todo-based) instead of raw stored value
+- LLM export includes read-only comment directing edits to `project.json`
+- Zoom level now persists across page loads (saved to sessionStorage)
+- Fixed scroll-to-center firing when dragging/repositioning an already-selected task
+- Fixed HMR reload loop caused by `project_llm.json` writes in dev mode
+
 ## 0.1.13
 
 - Overview zoom mode: new tab next to Day/Week/Month/Qtr with blank headers for a clean, date-free visual roadmap

@@ -83,6 +83,15 @@ export async function writeProjectBrowser(dirHandle: FileSystemDirectoryHandle, 
   await writable.close();
 }
 
+const LLM_EXPORT_FILE = 'project_llm.json';
+
+export async function writeLlmExportBrowser(dirHandle: FileSystemDirectoryHandle, data: object): Promise<void> {
+  const fileHandle = await dirHandle.getFileHandle(LLM_EXPORT_FILE, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+
 export async function writeMarkerBrowser(dirHandle: FileSystemDirectoryHandle): Promise<void> {
   const fileHandle = await dirHandle.getFileHandle(MARKER_FILE, { create: true });
   const writable = await fileHandle.createWritable();

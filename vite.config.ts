@@ -12,7 +12,7 @@ export default defineConfig({
 		...(isTauri && { strictPort: true, port: 5173 }),
 		watch: {
 			// Ignore project data files so saving a project inside the app dir doesn't trigger HMR
-			ignored: ['**/project.json', '**/.ganttapp'],
+			ignored: ['**/project.json', '**/project_llm.json', '**/.ganttapp'],
 		},
 	},
 	...(isTauri && {

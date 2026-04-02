@@ -23,7 +23,9 @@ import { isTauri } from '../persistence/isTauri.js';
 class GanttStore {
   // --- Core state ---
   focusPath = $state<string[]>([]);
-  zoomLevel = $state<ZoomLevel>('week');
+  zoomLevel = $state<ZoomLevel>(
+    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('gantt-zoomLevel') as ZoomLevel) || 'week'
+  );
   selectedTaskId = $state<string | null>(null);
   selectedTaskIds = $state<Set<string>>(new Set());
   hoveredTaskId = $state<string | null>(null);
@@ -171,7 +173,7 @@ class GanttStore {
       this._expandAncestors(id);
       interactionStore.clearDependencySelection();
     }
-    this.selectedTaskId = id;
+    if (this.selectedTaskId !== id) this.selectedTaskId = id;
     this.selectedTaskIds = new Set();
   }
 
@@ -261,6 +263,7 @@ class GanttStore {
 
   setZoom(level: ZoomLevel): void {
     this.zoomLevel = level;
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-zoomLevel', level);
   }
 
   updateTask(id: string, updates: Partial<GanttNode>): void {

@@ -3,6 +3,7 @@
 	import GanttTimeline from "./gantt-timeline.svelte";
 	import GanttHeader from "./gantt-header.svelte";
 
+	import { untrack } from "svelte";
 	import { TASK_LIST_WIDTH, ROW_HEIGHT } from "$lib/types.js";
 	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { timelineStore } from "$lib/stores/timeline/index.js";
@@ -13,35 +14,39 @@
 
 	// -------------------------------------------------------------------------
 	// Scroll to center selected task (both axes)
+	// Only fires when the selection *changes*, not when the selected task's
+	// data (dates, position) updates — otherwise drags/reorders cause scroll.
 	// -------------------------------------------------------------------------
 
 	let scrollEl = $state<HTMLDivElement | undefined>(undefined);
 
 	$effect(() => {
+		// Only track selectedTaskId — nothing else should re-trigger this.
 		const id = ganttStore.selectedTaskId;
 		if (!id || !scrollEl) return;
 
-		const rowIndex = ganttStore.rows.findIndex(r => r.id === id);
-		if (rowIndex === -1) return;
+		// untrack so row data / timeScale changes (from drags, moves) don't re-fire.
+		untrack(() => {
+			const rowIndex = ganttStore.rows.findIndex(r => r.id === id);
+			if (rowIndex === -1) return;
 
-		const row = ganttStore.rows[rowIndex];
-		const tScale = timelineStore.timeScale;
+			const row = ganttStore.rows[rowIndex];
+			const tScale = timelineStore.timeScale;
 
-		// With CSS zoom, layout coordinates are already scaled by the browser,
-		// so scroll offsets are in zoomed space — no manual scale factor needed.
-		const rowTop = HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
-		const rowCenter = rowTop + ROW_HEIGHT / 2;
-		const targetScrollTop = rowCenter - scrollEl.clientHeight / 2;
+			const rowTop = HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
+			const rowCenter = rowTop + ROW_HEIGHT / 2;
+			const targetScrollTop = rowCenter - scrollEl!.clientHeight / 2;
 
-		const barLeft = tScale(new Date(row.startDate));
-		const barRight = tScale(new Date(row.endDate));
-		const barCenter = TASK_LIST_WIDTH + (barLeft + barRight) / 2;
-		const targetScrollLeft = barCenter - scrollEl.clientWidth / 2;
+			const barLeft = tScale(new Date(row.startDate));
+			const barRight = tScale(new Date(row.endDate));
+			const barCenter = TASK_LIST_WIDTH + (barLeft + barRight) / 2;
+			const targetScrollLeft = barCenter - scrollEl!.clientWidth / 2;
 
-		scrollEl.scrollTo({
-			top: Math.max(0, targetScrollTop),
-			left: Math.max(0, targetScrollLeft),
-			behavior: 'smooth',
+			scrollEl!.scrollTo({
+				top: Math.max(0, targetScrollTop),
+				left: Math.max(0, targetScrollLeft),
+				behavior: 'smooth',
+			});
 		});
 	});
 
