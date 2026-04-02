@@ -1,4 +1,4 @@
-export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
+export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter' | 'overview';
 export type DependencyType = 'FS' | 'SS' | 'FF' | 'SF';
 
 export interface Todo {
@@ -110,5 +110,14 @@ export const ZOOM_CONFIGS: Record<ZoomLevel, ZoomConfig> = {
     topHeaderFormat: 'yyyy',
     bottomHeaderFormat: 'MMM',
     snapUnit: 'month',
+  },
+  overview: {
+    columnUnit: 'day',
+    columnWidth: 40,
+    topHeaderUnit: 'month',
+    bottomHeaderUnit: 'day',
+    topHeaderFormat: '',
+    bottomHeaderFormat: '',
+    snapUnit: 'day',
   },
 };

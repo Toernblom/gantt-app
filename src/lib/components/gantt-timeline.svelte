@@ -187,8 +187,10 @@
 		/>
 	{/each}
 
-	<!-- Today marker -->
-	<GanttTodayMarker {timeScale} {totalHeight} />
+	<!-- Today marker (hidden in overview mode) -->
+	{#if ganttStore.zoomLevel !== 'overview'}
+		<GanttTodayMarker {timeScale} {totalHeight} />
+	{/if}
 
 	<!-- Dependency link rubber-band (Shift+click source → click target) -->
 	{#if interactionStore.isLinking}

@@ -119,6 +119,7 @@
 					<ToggleGroup.Item value="week">Week</ToggleGroup.Item>
 					<ToggleGroup.Item value="month">Month</ToggleGroup.Item>
 					<ToggleGroup.Item value="quarter">Qtr</ToggleGroup.Item>
+					<ToggleGroup.Item value="overview">Overview</ToggleGroup.Item>
 				</ToggleGroup.Root>
 
 				<!-- UI scale indicator (only when not 100%) -->

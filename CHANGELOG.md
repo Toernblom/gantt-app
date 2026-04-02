@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13
+
+- Overview zoom mode: new tab next to Day/Week/Month/Qtr with blank headers for a clean, date-free visual roadmap
+
 ## 0.1.12
 
 - Multi-select: Ctrl+click to toggle tasks, or drag-select on empty timeline space to box-select
