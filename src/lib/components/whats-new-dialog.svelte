@@ -16,7 +16,7 @@
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2">
 				<SparklesIcon class="size-5 text-primary" />
-				Updated to v{updaterStore.updatedToVersion}
+				v{updaterStore.updatedToVersion}
 			</Dialog.Title>
 			<Dialog.Description>
 				Here's what's new in this version

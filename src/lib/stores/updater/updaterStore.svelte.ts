@@ -67,6 +67,20 @@ class UpdaterStore {
     this.changelogBody = null;
   }
 
+  /** Manually show the changelog for the current running version. */
+  async showCurrentChangelog(): Promise<void> {
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app');
+      const currentVersion = await getVersion();
+      this.updatedToVersion = currentVersion;
+      this.changelogBody = null;
+      this.showChangelog = true;
+      this._fetchReleaseNotes(currentVersion);
+    } catch {
+      // Not in Tauri — ignore
+    }
+  }
+
   /**
    * Compare the running app version against the last seen version in localStorage.
    * If different, the app was updated — show the changelog dialog.

@@ -573,6 +573,27 @@
 			</text>
 		{/if}
 
+		<!-- Completion banner: small pennant draped over the top edge -->
+		{#if row.progress >= 100 && row.hasChildren && previewWidth >= 20}
+			{@const bannerW = 8}
+			{@const bannerX = previewX + previewWidth - bannerW - 6}
+			{@const bannerTop = y - 2}
+			{@const bannerMid = y + barHeight * 0.55}
+			{@const bannerTip = y + barHeight * 0.7}
+			<polygon
+				points="
+					{bannerX},{bannerTop}
+					{bannerX + bannerW},{bannerTop}
+					{bannerX + bannerW},{bannerMid}
+					{bannerX + bannerW / 2},{bannerTip}
+					{bannerX},{bannerMid}
+				"
+				fill="white"
+				fill-opacity="0.85"
+				pointer-events="none"
+			/>
+		{/if}
+
 		<!-- Selection ring -->
 		{#if isSelected || isMultiSelected}
 			<rect

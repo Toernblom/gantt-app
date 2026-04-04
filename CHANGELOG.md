@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.15
+
+- Completion banner: small pennant flag on parent task bars when all subtasks are done
+- Long-press "Check for Updates" button to view the current version's changelog
+
 ## 0.1.14
 
 - LLM project export: auto-generates `project_llm.json` alongside `project.json` on every save — lean, ID-free view with Up Next and Blocked sections

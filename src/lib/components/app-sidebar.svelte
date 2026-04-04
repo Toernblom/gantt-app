@@ -21,6 +21,23 @@
 	const sidebar = Sidebar.useSidebar();
 
 	let recentProjects = $derived(persistenceStore.recentProjects);
+
+	// Long-press "Check for Updates" to view changelog
+	let holdTimer: ReturnType<typeof setTimeout> | null = null;
+	let holdFired = false;
+
+	function onUpdateMouseDown() {
+		holdFired = false;
+		holdTimer = setTimeout(() => {
+			holdFired = true;
+			updaterStore.showCurrentChangelog();
+		}, 500);
+	}
+
+	function onUpdateMouseUp() {
+		if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+		if (!holdFired) updaterStore.check();
+	}
 	let activeProject = $derived(projectStore.project);
 
 	function handleOpenRecent(entry: RecentEntry) {
@@ -171,8 +188,10 @@
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
-					tooltipContent="Check for updates"
-					onclick={() => updaterStore.check()}
+					tooltipContent="Check for updates (hold for changelog)"
+					onmousedown={onUpdateMouseDown}
+					onmouseup={onUpdateMouseUp}
+					onmouseleave={() => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } }}
 				>
 					<RefreshIcon class={updaterStore.checking ? 'animate-spin' : ''} />
 					<span>
