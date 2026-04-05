@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.17
+
+- Fixed save-then-revert bug: typing in description or resizing task bars no longer reverts to stale data
+- Root cause: file watcher detected our own disk writes as "external changes" and reloaded old state mid-edit
+- File watcher now skips events when a save is pending or in progress
+
 ## 0.1.16
 
 - Drag-to-reorder tasks in the sidebar via grip handle (hover left edge of any row)

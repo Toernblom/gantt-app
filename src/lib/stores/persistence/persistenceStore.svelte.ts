@@ -263,9 +263,13 @@ class PersistenceStore {
       if (!event.type || typeof event.type !== 'object') return;
       const eventType = Object.keys(event.type)[0];
       if (eventType !== 'modify') return;
+      // Skip if we have a pending or in-progress save — this is our own write
+      if (this._saveTimer || this.isSaving) return;
       if (Date.now() - this._lastWriteTime < PersistenceStore.WRITE_GUARD_MS) return;
       try {
         const project = await readProjectTauri(dirPath);
+        // Re-check after async read — a save may have been scheduled in the meantime
+        if (this._saveTimer || this.isSaving) return;
         if (this.onExternalChange) {
           this.onExternalChange(project);
         }
