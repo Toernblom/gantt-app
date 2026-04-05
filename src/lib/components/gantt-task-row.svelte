@@ -9,7 +9,6 @@
 
 	import { ganttStore } from "$lib/stores/gantt/ganttStore.svelte.js";
 	import { dialogStore } from "$lib/stores/dialog/index.js";
-	import { ROW_HEIGHT } from "$lib/types.js";
 	import type { GanttRow } from "$lib/types.js";
 
 	interface Props {
@@ -78,8 +77,7 @@
 				{...props}
 				role="row"
 				data-row-id={row.id}
-				style="height: {ROW_HEIGHT}px;"
-				class="relative flex cursor-pointer items-center overflow-hidden pr-2
+				class="relative flex h-full cursor-pointer items-center overflow-hidden pr-2
 					[transition:background-color_120ms]
 					{isSelected
 					? 'bg-accent/60 text-accent-foreground'

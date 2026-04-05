@@ -12,6 +12,8 @@ import {
   deleteNodeById,
   cleanDependencies,
   findAncestor,
+  findSiblings,
+  isDescendantOf,
   computeRowContexts,
   computeDependencyPairs,
   computeProgress,
@@ -24,7 +26,7 @@ class GanttStore {
   // --- Core state ---
   focusPath = $state<string[]>([]);
   zoomLevel = $state<ZoomLevel>(
-    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('gantt-zoomLevel') as ZoomLevel) || 'week'
+    (typeof localStorage !== 'undefined' && localStorage.getItem('gantt-zoomLevel') as ZoomLevel) || 'week'
   );
   selectedTaskId = $state<string | null>(null);
   selectedTaskIds = $state<Set<string>>(new Set());
@@ -32,8 +34,15 @@ class GanttStore {
   /** Pixel offset shared during multi-drag so timeline can render ghosts for all selected bars. */
   multiDragOffsetPx = $state(0);
   multiDragSourceId = $state<string | null>(null);
+  /** Reorder drag state — centralized so task list and timeline can both react. */
+  reorderDragId = $state<string | null>(null);
+  reorderDragLevel = $state<number>(-1);
+  reorderDropIndex = $state<number>(-1);
+  reorderDragActive = $state(false);
+  reorderDropZone = $state<'above' | 'child' | 'below' | null>(null);
+  reorderDropTargetId = $state<string | null>(null);
   viewMode = $state<'gantt' | 'kanban'>(
-    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('gantt-viewMode') as 'gantt' | 'kanban') || 'gantt'
+    (typeof localStorage !== 'undefined' && localStorage.getItem('gantt-viewMode') as 'gantt' | 'kanban') || 'gantt'
   );
   uiScale = $state<number>(
     (typeof sessionStorage !== 'undefined' && parseFloat(sessionStorage.getItem('gantt-uiScale') ?? '')) || 1
@@ -263,7 +272,7 @@ class GanttStore {
 
   setZoom(level: ZoomLevel): void {
     this.zoomLevel = level;
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-zoomLevel', level);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('gantt-zoomLevel', level);
   }
 
   updateTask(id: string, updates: Partial<GanttNode>): void {
@@ -299,6 +308,129 @@ class GanttStore {
     }
     cleanDependencies(projectStore.project.children, id);
     this._triggerSave();
+  }
+
+  /** Move a node up or down among its siblings. */
+  reorderNode(id: string, direction: -1 | 1): void {
+    const result = findSiblings(projectStore.project.children, id);
+    if (!result) return;
+    const { siblings, index } = result;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= siblings.length) return;
+    // Swap
+    [siblings[index], siblings[newIndex]] = [siblings[newIndex], siblings[index]];
+    this._triggerSave();
+  }
+
+  /** Move a node to a specific index among its siblings (for drag reorder). */
+  reorderNodeTo(id: string, targetIndex: number): void {
+    const result = findSiblings(projectStore.project.children, id);
+    if (!result) return;
+    const { siblings, index } = result;
+    if (targetIndex < 0 || targetIndex >= siblings.length || targetIndex === index) return;
+    const [node] = siblings.splice(index, 1);
+    siblings.splice(targetIndex, 0, node);
+    this._triggerSave();
+  }
+
+  /** Remove a node from its current parent and insert into a new parent at the given index. */
+  reparentNode(nodeId: string, newParentId: string | null, insertIndex: number): void {
+    const roots = projectStore.project.children;
+    const node = findNodeById(roots, nodeId);
+    if (!node) return;
+    // Prevent circular: can't drop a node into its own subtree
+    if (newParentId && isDescendantOf(roots, nodeId, newParentId)) return;
+
+    // Remove from current location
+    deleteNodeById(roots, nodeId);
+
+    // Insert into new parent
+    if (newParentId === null) {
+      roots.splice(Math.min(insertIndex, roots.length), 0, node);
+    } else {
+      const newParent = findNodeById(roots, newParentId);
+      if (!newParent) return;
+      newParent.children.splice(Math.min(insertIndex, newParent.children.length), 0, node);
+      newParent.expanded = true;
+    }
+    this._triggerSaveWithoutSnapshot();
+  }
+
+  /** Commit a reorder drag: handles both sibling reorder and cross-parent reparenting. */
+  commitReorder(): void {
+    const id = this.reorderDragId;
+    const zone = this.reorderDropZone;
+    const targetId = this.reorderDropTargetId;
+    if (!id || !zone || !targetId) return;
+
+    const roots = projectStore.project.children;
+
+    if (zone === 'child') {
+      // Snapshot before mutation
+      historyStore.snapshot();
+      this.reparentNode(id, targetId, 0);
+      return;
+    }
+
+    // 'above' or 'below': insert as sibling of the target row
+    const targetResult = findSiblings(roots, targetId);
+    if (!targetResult) return;
+
+    const sourceResult = findSiblings(roots, id);
+    if (!sourceResult) return;
+
+    const sameParent = targetResult.siblings === sourceResult.siblings;
+
+    if (sameParent) {
+      let targetIdx = targetResult.index;
+      if (zone === 'below') targetIdx++;
+      if (sourceResult.index < targetIdx) targetIdx--;
+      if (targetIdx === sourceResult.index || targetIdx < 0) return;
+      // Clamp to valid range after removal
+      targetIdx = Math.min(targetIdx, targetResult.siblings.length - 1);
+      // Snapshot before mutation
+      historyStore.snapshot();
+      const [node] = targetResult.siblings.splice(sourceResult.index, 1);
+      targetResult.siblings.splice(targetIdx, 0, node);
+      this._triggerSaveWithoutSnapshot();
+    } else {
+      // Cross-parent: reparent
+      const insertIdx = zone === 'below' ? targetResult.index + 1 : targetResult.index;
+      const targetNode = findNodeById(roots, targetId);
+      if (!targetNode) return;
+      let parentId: string | null = null;
+      const findParent = (nodes: GanttNode[], needle: string, parent: string | null): string | null => {
+        for (const n of nodes) {
+          if (n.id === needle) return parent;
+          const found = findParent(n.children, needle, n.id);
+          if (found !== undefined && found !== null) return found;
+        }
+        return null;
+      };
+      parentId = findParent(roots, targetId, null);
+      // Snapshot before mutation
+      historyStore.snapshot();
+      this.reparentNode(id, parentId, insertIdx);
+    }
+  }
+
+  private _countSiblingsUpTo(rows: GanttRow[], rowIndex: number, level: number): number {
+    let count = 0;
+    for (let i = 0; i < rowIndex && i < rows.length; i++) {
+      if (rows[i].level < level) count = 0;
+      else if (rows[i].level === level) count++;
+    }
+    return count;
+  }
+
+  /** Clear all reorder drag state. */
+  clearReorderDrag(): void {
+    this.reorderDragId = null;
+    this.reorderDragLevel = -1;
+    this.reorderDropIndex = -1;
+    this.reorderDragActive = false;
+    this.reorderDropZone = null;
+    this.reorderDropTargetId = null;
   }
 
   setHoveredTask(id: string | null): void {
@@ -338,12 +470,12 @@ class GanttStore {
   // --- Methods: view mode ---
   setViewMode(mode: 'gantt' | 'kanban'): void {
     this.viewMode = mode;
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-viewMode', mode);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('gantt-viewMode', mode);
   }
 
   setUiScale(scale: number): void {
     this.uiScale = Math.round(Math.max(0.5, Math.min(2, scale)) * 100) / 100;
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gantt-uiScale', String(this.uiScale));
+    if (typeof localStorage !== 'undefined') localStorage.setItem('gantt-uiScale', String(this.uiScale));
   }
 
   resetUiScale(): void {

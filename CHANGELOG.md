@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.16
+
+- Drag-to-reorder tasks in the sidebar via grip handle (hover left edge of any row)
+- Three-zone drop: top/bottom of row = sibling insert, middle = reparent as child
+- Cross-parent reparenting: drag tasks between different phases/epics
+- Circular drop prevention (can't drop a parent into its own subtree)
+- Auto-expands target parent on drop
+- Zoom level and view mode now persist across app restarts (switched from sessionStorage to localStorage)
+- Fixed undo reliability: `_skipNextSnapshot` flag no longer poisons subsequent snapshots after undo/redo
+
 ## 0.1.15
 
 - Completion banner: small pennant flag on parent task bars when all subtasks are done

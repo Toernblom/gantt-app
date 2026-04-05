@@ -27,23 +27,19 @@ class HistoryStore {
 
   undo(): void {
     if (this._undoStack.length === 0) return;
-    // Save current state to redo stack
     this._redoStack.push(JSON.stringify(projectStore.project));
-    // Restore previous state
     const prev = this._undoStack.pop()!;
-    this._skipNextSnapshot = true;
     projectStore.loadProject(JSON.parse(prev) as Project);
+    this._skipNextSnapshot = false;
     this._updateFlags();
   }
 
   redo(): void {
     if (this._redoStack.length === 0) return;
-    // Save current state to undo stack
     this._undoStack.push(JSON.stringify(projectStore.project));
-    // Restore next state
     const next = this._redoStack.pop()!;
-    this._skipNextSnapshot = true;
     projectStore.loadProject(JSON.parse(next) as Project);
+    this._skipNextSnapshot = false;
     this._updateFlags();
   }
 

@@ -56,6 +56,23 @@ export function findNodeById(nodes: GanttNode[], id: string): GanttNode | null {
   return null;
 }
 
+/** Find the siblings array containing a node and its index within that array. */
+export function findSiblings(roots: GanttNode[], id: string): { siblings: GanttNode[]; index: number } | null {
+  for (let i = 0; i < roots.length; i++) {
+    if (roots[i].id === id) return { siblings: roots, index: i };
+    const found = findSiblings(roots[i].children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Check if ancestorId contains targetId anywhere in its subtree. */
+export function isDescendantOf(roots: GanttNode[], ancestorId: string, targetId: string): boolean {
+  const ancestor = findNodeById(roots, ancestorId);
+  if (!ancestor) return false;
+  return !!findNodeById(ancestor.children, targetId);
+}
+
 export function deleteNodeById(nodes: GanttNode[], id: string): boolean {
   for (let i = 0; i < nodes.length; i++) {
     if (nodes[i].id === id) {
