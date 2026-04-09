@@ -1,10 +1,14 @@
 # Changelog
 
-## 0.1.18
+## 0.1.19
 
-- Fixed "forbidden path" error on Windows when reading projects from AppData
-- Root cause: Tauri v2's `**` glob scope doesn't match absolute Windows paths; added explicit `$APPDATA/**` to all FS permissions
-- Switched recent-projects storage to use `BaseDirectory.AppData` instead of resolving absolute paths
+- Fixed "forbidden path" error on Windows when opening or creating projects
+- Root cause: Tauri v2 requires both `$APPDATA` and `$APPDATA/**` in scope (directory itself + contents); bare `**` doesn't match absolute Windows paths
+- Added `fs:scope-appdata-recursive` base scope and explicit `$APPDATA` entries to all FS permissions
+- Recent-projects storage now uses `BaseDirectory.AppData` instead of resolving absolute paths
+- Recents save errors no longer block project loading (misleading "Failed to read project" error)
+
+## 0.1.18
 
 ## 0.1.17
 

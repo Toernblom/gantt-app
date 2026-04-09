@@ -1,4 +1,4 @@
-import { readTextFile, writeTextFile, exists, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const RECENTS_FILE = 'recent-projects.json';
 
@@ -10,16 +10,9 @@ export interface RecentEntry {
   dirPath: string;
 }
 
-async function ensureAppDataDir(): Promise<void> {
-  if (!(await exists('', { baseDir: BaseDirectory.AppData }))) {
-    await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true });
-  }
-}
-
 async function readRecents(): Promise<RecentEntry[]> {
-  await ensureAppDataDir();
-  if (!(await exists(RECENTS_FILE, { baseDir: BaseDirectory.AppData }))) return [];
   try {
+    if (!(await exists(RECENTS_FILE, { baseDir: BaseDirectory.AppData }))) return [];
     const text = await readTextFile(RECENTS_FILE, { baseDir: BaseDirectory.AppData });
     return JSON.parse(text) as RecentEntry[];
   } catch {
@@ -28,7 +21,6 @@ async function readRecents(): Promise<RecentEntry[]> {
 }
 
 async function writeRecents(entries: RecentEntry[]): Promise<void> {
-  await ensureAppDataDir();
   await writeTextFile(RECENTS_FILE, JSON.stringify(entries, null, 2), { baseDir: BaseDirectory.AppData });
 }
 

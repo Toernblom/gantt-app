@@ -9,25 +9,26 @@
     "dialog:allow-open",
     "updater:default",
     "process:allow-restart",
+    "fs:scope-appdata-recursive",
     {
       "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-watch",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }]
     }
   ]
 }

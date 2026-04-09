@@ -121,8 +121,9 @@ class PersistenceStore {
       const project = await readProjectTauri(entry.dirPath);
       await this._setActiveDir(entry.dirPath);
       this.error = null;
-      await saveRecentProject({ ...entry, lastOpened: new Date().toISOString() });
-      await this.loadRecents();
+      // Save recents separately — don't let APPDATA errors block project loading
+      saveRecentProject({ ...entry, lastOpened: new Date().toISOString() }).catch(() => {});
+      this.loadRecents().catch(() => {});
       return project;
     } catch (e) {
       this.error = `Failed to read project: ${e instanceof Error ? e.message : String(e)}`;
@@ -158,8 +159,9 @@ class PersistenceStore {
       const project = await readProjectTauri(dirPath);
       await this._setActiveDir(dirPath);
       this.error = null;
-      await saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath });
-      await this.loadRecents();
+      // Save recents separately — don't let APPDATA errors block project loading
+      saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath }).catch(() => {});
+      this.loadRecents().catch(() => {});
       return project;
     } catch (e) {
       this.error = `Failed to read project: ${e instanceof Error ? e.message : String(e)}`;
@@ -187,8 +189,9 @@ class PersistenceStore {
       await writeProjectTauri(dirPath, project);
       await this._setActiveDir(dirPath);
       this.error = null;
-      await saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath });
-      await this.loadRecents();
+      // Save recents separately — don't let APPDATA errors block project creation
+      saveRecentProject({ id: project.id, name: project.name, lastOpened: new Date().toISOString(), dirPath }).catch(() => {});
+      this.loadRecents().catch(() => {});
       return project;
     } catch (e) {
       this.error = `Failed to create project: ${e instanceof Error ? e.message : String(e)}`;
