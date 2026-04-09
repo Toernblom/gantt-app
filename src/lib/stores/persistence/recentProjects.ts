@@ -1,4 +1,4 @@
-import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, exists, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const RECENTS_FILE = 'recent-projects.json';
 
@@ -21,6 +21,7 @@ async function readRecents(): Promise<RecentEntry[]> {
 }
 
 async function writeRecents(entries: RecentEntry[]): Promise<void> {
+  await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true });
   await writeTextFile(RECENTS_FILE, JSON.stringify(entries, null, 2), { baseDir: BaseDirectory.AppData });
 }
 

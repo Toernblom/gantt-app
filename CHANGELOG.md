@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.20
+
+- Fixed recent projects not being saved (APPDATA directory wasn't being created before write)
+
 ## 0.1.19
 
 - Fixed "forbidden path" error on Windows when opening or creating projects
