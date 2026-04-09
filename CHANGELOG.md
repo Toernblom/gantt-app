@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.21
+
+- Right-click and drag to pan the Gantt chart (both axes)
+- Context menu suppressed on the chart area to enable panning
+
 ## 0.1.20
 
 - Fixed recent projects not being saved (APPDATA directory wasn't being created before write)

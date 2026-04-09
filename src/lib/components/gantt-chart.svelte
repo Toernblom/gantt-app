@@ -61,6 +61,45 @@
 		ganttStore.setUiScale(ganttStore.uiScale + delta);
 	}
 
+	// -------------------------------------------------------------------------
+	// Right-click drag to pan
+	// -------------------------------------------------------------------------
+
+	let isPanning = $state(false);
+	let panLastX = 0;
+	let panLastY = 0;
+
+	function handlePanStart(e: MouseEvent) {
+		if (e.button !== 2 || !scrollEl) return;
+		e.preventDefault();
+		isPanning = true;
+		panLastX = e.clientX;
+		panLastY = e.clientY;
+		window.addEventListener('mousemove', handlePanMove);
+		window.addEventListener('mouseup', handlePanEnd);
+	}
+
+	function handlePanMove(e: MouseEvent) {
+		if (!isPanning || !scrollEl) return;
+		const dx = e.clientX - panLastX;
+		const dy = e.clientY - panLastY;
+		scrollEl.scrollLeft -= dx;
+		scrollEl.scrollTop -= dy;
+		panLastX = e.clientX;
+		panLastY = e.clientY;
+	}
+
+	function handlePanEnd() {
+		isPanning = false;
+		window.removeEventListener('mousemove', handlePanMove);
+		window.removeEventListener('mouseup', handlePanEnd);
+	}
+
+	function handleContextMenu(e: MouseEvent) {
+		// Suppress context menu on the chart — right-click is used for panning
+		e.preventDefault();
+	}
+
 </script>
 
 <!--
@@ -80,9 +119,12 @@
 		role="grid"
 		aria-label="Gantt chart"
 		class="gantt-scroll h-full overflow-auto outline-none"
+		class:cursor-grabbing={isPanning}
 		tabindex="0"
 		onkeydown={(e) => ganttStore.handleKeyDown(e)}
 		onwheel={handleWheel}
+		onmousedown={handlePanStart}
+		oncontextmenu={handleContextMenu}
 		onclick={() => interactionStore.clearDependencySelection()}
 	>
 		<div
