@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18
+
+- Fixed "forbidden path" error on Windows when reading projects from AppData
+- Root cause: Tauri v2's `**` glob scope doesn't match absolute Windows paths; added explicit `$APPDATA/**` to all FS permissions
+- Switched recent-projects storage to use `BaseDirectory.AppData` instead of resolving absolute paths
+
 ## 0.1.17
 
 - Fixed save-then-revert bug: typing in description or resizing task bars no longer reverts to stale data

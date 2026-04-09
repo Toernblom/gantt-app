@@ -11,19 +11,19 @@
     "process:allow-restart",
     {
       "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-watch",
-      "allow": [{ "path": "**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-mkdir",

@@ -1,5 +1,4 @@
-import { readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { readTextFile, writeTextFile, exists, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const RECENTS_FILE = 'recent-projects.json';
 
@@ -11,20 +10,17 @@ export interface RecentEntry {
   dirPath: string;
 }
 
-async function getRecentsPath(): Promise<string> {
-  const appDir = await appDataDir();
-  // Ensure the app data directory exists
-  if (!(await exists(appDir))) {
-    await mkdir(appDir, { recursive: true });
+async function ensureAppDataDir(): Promise<void> {
+  if (!(await exists('', { baseDir: BaseDirectory.AppData }))) {
+    await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true });
   }
-  return join(appDir, RECENTS_FILE);
 }
 
 async function readRecents(): Promise<RecentEntry[]> {
-  const path = await getRecentsPath();
-  if (!(await exists(path))) return [];
+  await ensureAppDataDir();
+  if (!(await exists(RECENTS_FILE, { baseDir: BaseDirectory.AppData }))) return [];
   try {
-    const text = await readTextFile(path);
+    const text = await readTextFile(RECENTS_FILE, { baseDir: BaseDirectory.AppData });
     return JSON.parse(text) as RecentEntry[];
   } catch {
     return [];
@@ -32,8 +28,8 @@ async function readRecents(): Promise<RecentEntry[]> {
 }
 
 async function writeRecents(entries: RecentEntry[]): Promise<void> {
-  const path = await getRecentsPath();
-  await writeTextFile(path, JSON.stringify(entries, null, 2));
+  await ensureAppDataDir();
+  await writeTextFile(RECENTS_FILE, JSON.stringify(entries, null, 2), { baseDir: BaseDirectory.AppData });
 }
 
 export async function getRecentProjects(): Promise<RecentEntry[]> {
