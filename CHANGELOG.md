@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.23
+
+- New "Hide from Up Next" toggle on epic tasks (Details tab → Properties): hides the whole subtree (sub-tasks + todos) from the Up Next panel in one click
+- Useful for parking epics you're not ready to work on without having to tweak progress or dependencies
+
 ## 0.1.22
 
 - Left-clicking a task no longer animates the view towards it — felt jarring during normal selection

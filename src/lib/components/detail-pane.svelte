@@ -370,6 +370,23 @@
 										</div>
 									</div>
 								{/if}
+
+								<!-- Hide from Up Next — only show for epics (tasks with children) -->
+								{#if selectedTask && isParent}
+									<div class="flex items-center gap-2 pt-2">
+										<Switch
+											id="hide-from-priority"
+											checked={selectedTask.hideFromPriority ?? false}
+											onCheckedChange={(checked) => {
+												if (selectedTaskId) ganttStore.updateTask(selectedTaskId, { hideFromPriority: checked });
+											}}
+										/>
+										<div class="flex flex-col">
+											<Label for="hide-from-priority" class="text-xs cursor-pointer">Hide from Up Next</Label>
+											<span class="text-[10px] text-muted-foreground">Hide this epic's sub-tasks and todos from the Up Next panel</span>
+										</div>
+									</div>
+								{/if}
 							</Card.Content>
 						</Card.Root>
 					</div>

@@ -40,6 +40,12 @@ class PriorityStore {
       // Skip parent/epic nodes (nodes with children) — focus on leaf work
       if (task.children.length > 0) continue;
 
+      // Skip if the task OR any ancestor is flagged hideFromPriority.
+      // Setting the flag on an epic hides the whole subtree from Up Next.
+      if (task.hideFromPriority) continue;
+      const hideAncestors = this._getAncestors(task.id, projectStore.project.children);
+      if (hideAncestors.some(a => a.hideFromPriority)) continue;
+
       let score = 0;
       const reasons: string[] = [];
 

@@ -28,6 +28,8 @@ export interface GanttNode {
   kanbanColumnId: string;
   /** When true, this task (and its children) won't appear in Up Next until all dependency predecessors reach 100% progress. */
   requireDepsComplete?: boolean;
+  /** When true, this task and all its descendants (sub-tasks + todos) are hidden from the Up Next panel entirely. */
+  hideFromPriority?: boolean;
 }
 
 export interface Project {
