@@ -47,6 +47,12 @@ class GanttStore {
   uiScale = $state<number>(
     (typeof sessionStorage !== 'undefined' && parseFloat(sessionStorage.getItem('gantt-uiScale') ?? '')) || 1
   );
+  /**
+   * Scroll-to-task request: bumped by `revealTask()` to ask the chart to
+   * animate-scroll a specific task into view. Plain `selectTask()` does NOT
+   * touch this — direct clicks on the chart should not scroll the view.
+   */
+  scrollRequest = $state<{ id: string; nonce: number } | null>(null);
 
   // --- Derived: navigation ---
   focusedNode = $derived<GanttNode | null>(
@@ -184,6 +190,17 @@ class GanttStore {
     }
     if (this.selectedTaskId !== id) this.selectedTaskId = id;
     this.selectedTaskIds = new Set();
+  }
+
+  /**
+   * Select a task AND ask the chart to animate-scroll it into view.
+   * Use this from external navigation paths (command palette, priority pane,
+   * keyboard arrow navigation). Direct clicks on the chart should use
+   * `selectTask()` — the view already shows what the user clicked.
+   */
+  revealTask(id: string): void {
+    this.selectTask(id);
+    this.scrollRequest = { id, nonce: (this.scrollRequest?.nonce ?? 0) + 1 };
   }
 
   /** Ctrl+click: toggle a task in/out of multi-selection. */
@@ -586,13 +603,13 @@ class GanttStore {
       case 'ArrowDown': {
         e.preventDefault();
         const nextIndex = currentIndex < rows.length - 1 ? currentIndex + 1 : 0;
-        this.selectTask(rows[nextIndex].id);
+        this.revealTask(rows[nextIndex].id);
         break;
       }
       case 'ArrowUp': {
         e.preventDefault();
         const prevIndex = currentIndex > 0 ? currentIndex - 1 : rows.length - 1;
-        this.selectTask(rows[prevIndex].id);
+        this.revealTask(rows[prevIndex].id);
         break;
       }
       case 'ArrowRight': {

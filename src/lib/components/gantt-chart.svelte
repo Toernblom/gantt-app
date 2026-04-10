@@ -13,21 +13,22 @@
 	const HEADER_HEIGHT = 64;
 
 	// -------------------------------------------------------------------------
-	// Scroll to center selected task (both axes)
-	// Only fires when the selection *changes*, not when the selected task's
-	// data (dates, position) updates — otherwise drags/reorders cause scroll.
+	// Scroll to center a task (both axes)
+	// Only fires on explicit `ganttStore.revealTask()` calls — i.e. command
+	// palette, priority pane, keyboard arrow nav. Direct clicks on bars/rows
+	// go through plain `selectTask()` and do NOT trigger scrolling.
 	// -------------------------------------------------------------------------
 
 	let scrollEl = $state<HTMLDivElement | undefined>(undefined);
 
 	$effect(() => {
-		// Only track selectedTaskId — nothing else should re-trigger this.
-		const id = ganttStore.selectedTaskId;
-		if (!id || !scrollEl) return;
+		// Track the scroll request nonce — bumped by `revealTask()`.
+		const req = ganttStore.scrollRequest;
+		if (!req || !scrollEl) return;
 
 		// untrack so row data / timeScale changes (from drags, moves) don't re-fire.
 		untrack(() => {
-			const rowIndex = ganttStore.rows.findIndex(r => r.id === id);
+			const rowIndex = ganttStore.rows.findIndex(r => r.id === req.id);
 			if (rowIndex === -1) return;
 
 			const row = ganttStore.rows[rowIndex];

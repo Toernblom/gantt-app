@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.22
+
+- Left-clicking a task no longer animates the view towards it — felt jarring during normal selection
+- Fuzzy search (Ctrl+K), "Up Next" clicks, and keyboard arrow navigation still animate-scroll to the task as before
+- `project_llm.json` now starts with an `_comment` field marking it as auto-generated so users know not to edit it by hand
+
 ## 0.1.21
 
 - Right-click and drag to pan the Gantt chart (both axes)

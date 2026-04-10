@@ -16,7 +16,7 @@
   let showBlocked = $state(false);
 
   function handleClick(item: PriorityItem) {
-    ganttStore.selectTask(item.task.id);
+    ganttStore.revealTask(item.task.id);
   }
 </script>
 

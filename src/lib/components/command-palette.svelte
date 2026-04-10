@@ -33,12 +33,10 @@
 
   function handleSelectTask(taskId: string) {
     open = false;
-    // Switch to gantt if needed, then select after a tick so the chart mounts first
+    // Switch to gantt if needed, then reveal after a tick so the chart mounts first
     if (ganttStore.viewMode === 'kanban') ganttStore.setViewMode('gantt');
-    // Clear then re-set selection to retrigger the scroll-to-center $effect
-    ganttStore.selectTask(null);
     requestAnimationFrame(() => {
-      ganttStore.selectTask(taskId);
+      ganttStore.revealTask(taskId);
     });
   }
 </script>
