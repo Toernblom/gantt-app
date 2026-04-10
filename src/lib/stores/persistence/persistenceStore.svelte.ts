@@ -9,7 +9,6 @@ import {
   writeLlmExport as writeLlmExportTauri,
   writeMarker as writeMarkerTauri,
   pickProjectFolder as pickProjectFolderTauri,
-  getProjectFilePath,
 } from './fileSystem.js';
 import {
   getRecentProjects, saveRecentProject, removeRecentProject,
@@ -260,12 +259,35 @@ class PersistenceStore {
   private async _startWatching(dirPath: string): Promise<void> {
     await this._stopWatching();
     if (!isTauri) return;
-    const projectFilePath = await getProjectFilePath(dirPath);
     const { watch } = await import('@tauri-apps/plugin-fs');
-    const unwatchFn = await watch(projectFilePath, async (event) => {
-      if (!event.type || typeof event.type !== 'object') return;
-      const eventType = Object.keys(event.type)[0];
-      if (eventType !== 'modify') return;
+    // Watch the parent DIRECTORY, not the file itself. Watching a single file
+    // is unreliable on Windows when an external writer (LLM, editor) saves
+    // atomically by renaming a temp file over project.json — the inode changes
+    // and notify-rs loses the handle, silently dropping all future events.
+    // Watching the directory sidesteps this entirely.
+    const unwatchFn = await watch(dirPath, async (event) => {
+      // Filter by path: only care about changes to project.json (ignore
+      // project_llm.json, .ganttapp, etc.).
+      const touchesProjectFile = event.paths?.some(
+        (p) => (p.split(/[\\/]/).pop() ?? '').toLowerCase() === 'project.json'
+      );
+      if (!touchesProjectFile) return;
+
+      // Filter by event kind. Tauri's WatchEvent.type is either a string
+      // ('any' | 'other') or an object like { modify: {...} }, { create: {...} },
+      // { access: {...} }, { remove: {...} }. Accept modify + create + any
+      // (catch-all); skip access (reads only), remove (nothing to reload),
+      // and 'other' (unknown).
+      const type = event.type;
+      let interesting = false;
+      if (typeof type === 'string') {
+        interesting = type === 'any';
+      } else if (type && typeof type === 'object') {
+        const kind = Object.keys(type)[0];
+        interesting = kind === 'modify' || kind === 'create';
+      }
+      if (!interesting) return;
+
       // Skip if we have a pending or in-progress save — this is our own write
       if (this._saveTimer || this.isSaving) return;
       if (Date.now() - this._lastWriteTime < PersistenceStore.WRITE_GUARD_MS) return;

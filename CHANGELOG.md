@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.24
+
+- Fixed file watcher missing external edits to `project.json` on Windows when an LLM/editor saved atomically (temp-file + rename) — the view now refreshes automatically instead of requiring F5
+- Root cause: watching the file directly made `notify-rs` lose its handle when the inode was swapped by the rename; now watching the parent directory and filtering events by filename
+- Also accept `create` events in addition to `modify`, so atomic rewrites that surface as a new file are picked up
+
 ## 0.1.23
 
 - New "Hide from Up Next" toggle on epic tasks (Details tab → Properties): hides the whole subtree (sub-tasks + todos) from the Up Next panel in one click
