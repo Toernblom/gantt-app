@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Gantt App",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "identifier": "com.ganttapp.desktop",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:cli && npm run build"
   },
   "app": {
     "windows": [
@@ -30,6 +30,9 @@
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk3QUYzNjlGRjkxNzk3M0IKUldRN2x4ZjVuemF2bHp2YmV6QkxmZ3pOWXY5UzJKTlVNbjdDUDFOSHMwY2orNHhFNU5jaHZ6ZUoK"
     }
+  },
+  "resources": {
+    "resources/*": ""
   },
   "bundle": {
     "active": true,

@@ -101,6 +101,25 @@
 		e.preventDefault();
 	}
 
+	// -------------------------------------------------------------------------
+	// Viewport sync (scroll position + client width)
+	// -------------------------------------------------------------------------
+
+	function syncViewport() {
+		if (!scrollEl) return;
+		ganttStore.viewportScrollLeft = scrollEl.scrollLeft;
+		ganttStore.viewportClientWidth = scrollEl.clientWidth;
+	}
+
+	// Sync viewport dimensions on mount and resize
+	$effect(() => {
+		if (!scrollEl) return;
+		syncViewport();
+		const ro = new ResizeObserver(() => syncViewport());
+		ro.observe(scrollEl);
+		return () => ro.disconnect();
+	});
+
 </script>
 
 <!--
@@ -126,6 +145,7 @@
 		onwheel={handleWheel}
 		onmousedown={handlePanStart}
 		oncontextmenu={handleContextMenu}
+		onscroll={syncViewport}
 		onclick={() => interactionStore.clearDependencySelection()}
 	>
 		<div

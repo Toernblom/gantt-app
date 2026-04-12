@@ -97,7 +97,8 @@
 				</div>
 			{/if}
 
-			<!-- Dates -->
+			<!-- Dates (hidden in overview mode — auto-placed at viewport center) -->
+			{#if !dialogStore.isOverviewCreate}
 			<div class="grid grid-cols-2 gap-3">
 				<!-- Start Date -->
 				<div class="flex flex-col gap-1.5">
@@ -165,6 +166,7 @@
 					</Popover.Root>
 				</div>
 			</div>
+			{/if}
 
 			<Separator />
 

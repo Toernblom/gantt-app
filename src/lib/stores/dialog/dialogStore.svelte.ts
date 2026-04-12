@@ -1,5 +1,7 @@
 import { ganttStore } from '../gantt/ganttStore.svelte.js';
+import { timelineStore } from '../timeline/index.js';
 import type { GanttNode } from '$lib/types';
+import { TASK_LIST_WIDTH } from '$lib/types';
 import type { DateValue } from '@internationalized/date';
 import { CalendarDate, parseDate, today, getLocalTimeZone } from '@internationalized/date';
 
@@ -45,6 +47,9 @@ class DialogStore {
   /** True when creating a sub-task under a specific parent (hide epic selector). */
   hasPresetParent = $derived(this.mode === 'create' && !!this.defaultEpicId);
 
+  /** True when creating in overview mode — dates auto-set, no date pickers shown. */
+  isOverviewCreate = $state(false);
+
   // --- Helpers ---
   isoToDateValue(iso: string | undefined): DateValue | undefined {
     if (!iso) return undefined;
@@ -63,10 +68,24 @@ class DialogStore {
   }
 
   // --- Methods ---
+  private _getViewportCenterIso(): string {
+    const centerX = ganttStore.viewportScrollLeft + (ganttStore.viewportClientWidth - TASK_LIST_WIDTH) / 2;
+    const centerDate = timelineStore.timeScale.invert(Math.max(0, centerX));
+    const y = centerDate.getFullYear();
+    const m = String(centerDate.getMonth() + 1).padStart(2, '0');
+    const d = String(centerDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   requestCreate(epicId?: string, startDate?: string): void {
     this.editTask = undefined;
     this.defaultEpicId = epicId;
-    this.defaultStartDate = startDate;
+    this.isOverviewCreate = ganttStore.zoomLevel === 'overview';
+    if (this.isOverviewCreate) {
+      this.defaultStartDate = this._getViewportCenterIso();
+    } else {
+      this.defaultStartDate = startDate;
+    }
     this.mode = 'create';
     this.resetForm();
     this.open = true;
@@ -76,6 +95,7 @@ class DialogStore {
     const node = ganttStore.getNodeById(taskId);
     if (!node) return;
     this.editTask = node;
+    this.isOverviewCreate = false;
     this.mode = 'edit';
     this.populateFromTask(node);
     this.open = true;
@@ -92,11 +112,12 @@ class DialogStore {
       ? this.isoToDateValue(this.defaultStartDate)
       : today(getLocalTimeZone());
     this.startDateValue = defaultStart;
-    const tomorrow =
+    const daysToAdd = this.isOverviewCreate ? 7 : 1;
+    const defaultEnd =
       defaultStart instanceof CalendarDate
-        ? defaultStart.add({ days: 1 })
-        : today(getLocalTimeZone()).add({ days: 1 });
-    this.endDateValue = tomorrow;
+        ? defaultStart.add({ days: daysToAdd })
+        : today(getLocalTimeZone()).add({ days: daysToAdd });
+    this.endDateValue = defaultEnd;
     this.isMilestone = false;
     this.selectedColor = TASK_COLORS[0];
   }

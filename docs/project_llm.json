@@ -1,0 +1,99 @@
+{
+  "_comment": "READ-ONLY. Auto-generated from project.json. Edit project.json to make changes.",
+  "name": "docs",
+  "tasks": [
+    {
+      "name": "1.0",
+      "progress": 0,
+      "startDate": "2026-04-10",
+      "endDate": "2026-05-10",
+      "children": [
+        {
+          "name": "CLI tool: gantt list/add/update/delete",
+          "progress": 0,
+          "startDate": "2026-04-11",
+          "endDate": "2026-04-18",
+          "description": "TypeScript CLI run via `tsx scripts/gantt.ts`, consumed by LLMs so they can query and mutate project.json without reading the whole blob.\n\n**Language: TypeScript (Node).** Chosen over Rust/Go so the CLI can import `src/lib/types.ts` and `src/lib/stores/gantt/helpers.ts` directly. Single source of truth for schema + tree ops; schema drift in another language would silently corrupt project.json on write.\n\n**Architecture:**\n- Extract mutation logic from `ganttStore.svelte.ts` into a new `src/lib/stores/gantt/mutations.ts` — pure functions over a `Project`, shared by the Svelte store and the CLI.\n- `scripts/gantt.ts` handles arg parsing, output formatting, atomic file I/O (temp + rename), and calls into `mutations.ts`.\n- After every write the CLI regenerates `project_llm.json` via the existing `buildLlmExport()` so the lean LLM sidecar stays in sync.\n- App's file watcher currently does not detect external writes — this must be fixed so CLI edits appear in the chart without an app restart.\n\n**Commands (v1):** list, show, up-next, add task, add todo, add dep, update, delete, toggle-todo, remove dep.\n\n**Task references:** accept name (fuzzy unique match) OR ID prefix, so LLMs don't have to carry full IDs.\n\n**Project discovery:** auto-walk upward from CWD for `.ganttapp` marker; `--project <path>` overrides.\n\n**Distribution:** Bundled with the Tauri .exe release so it auto-updates alongside the app. Build step uses esbuild to bundle into a single `gantt-cli.js` included in Tauri's `resources/` directory. Requires Node on the host machine. LLM agents invoke it via `node \"<app-install-path>/resources/gantt-cli.js\" <command>`.\n\n**Known limitation:** race between CLI writes and app's debounced save if the user is typing in the app at the same time. Skip for v1 — intended workflow is LLM-edits-while-user-watches, no concurrent typing.",
+          "todos": [
+            {
+              "text": "Refactor: extract mutation logic from ganttStore into pure mutations.ts (addTask, updateTask, deleteTask + cleanDeps, addTodo, addDep, etc.)",
+              "done": false
+            },
+            {
+              "text": "Wire ganttStore methods to call mutations.ts — store keeps reactive state + save triggering, mutations stay pure",
+              "done": false
+            },
+            {
+              "text": "Project discovery: walk up from CWD for .ganttapp marker, --project override",
+              "done": false
+            },
+            {
+              "text": "Task reference resolver: fuzzy name match unique-or-bail, fall back to ID prefix",
+              "done": false
+            },
+            {
+              "text": "Atomic writer: write project.json.tmp, fsync, rename; then same for project_llm.json via buildLlmExport()",
+              "done": false
+            },
+            {
+              "text": "Read commands: list (tree), show <task>, up-next",
+              "done": false
+            },
+            {
+              "text": "Write commands: add task [--parent --start --end --color --milestone]",
+              "done": false
+            },
+            {
+              "text": "Write commands: update <task> [--name --start --end --progress --description --color]",
+              "done": false
+            },
+            {
+              "text": "Write commands: delete <task> (uses cleanDependencies to strip dangling refs)",
+              "done": false
+            },
+            {
+              "text": "Todo commands: add-todo, toggle-todo, remove-todo, move-todo <todo> --to <task>",
+              "done": false
+            },
+            {
+              "text": "Dependency commands: add-dep, remove-dep",
+              "done": false
+            },
+            {
+              "text": "Add `gantt` npm script (tsx scripts/gantt.ts) — works with `npm run gantt -- list` for dev use",
+              "done": false
+            },
+            {
+              "text": "esbuild bundle step: compile CLI into single gantt-cli.js, add to Tauri resources/ so it ships with the .exe and auto-updates",
+              "done": false
+            },
+            {
+              "text": "Fix file watcher: external edits to project.json (e.g. by LLM agents) are not picked up — app requires restart to reflect changes",
+              "done": false
+            },
+            {
+              "text": "Manual test: run CLI while app is open, verify file watcher refreshes the chart live",
+              "done": false
+            },
+            {
+              "text": "Document commands + examples in README or docs/cli.md",
+              "done": false
+            },
+            {
+              "text": "Create scripts/gantt.ts with arg parsing and command dispatcher",
+              "done": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "upNext": [
+    {
+      "name": "CLI tool: gantt list/add/update/delete",
+      "progress": 0,
+      "reason": "Started 1d ago"
+    }
+  ],
+  "blocked": []
+}

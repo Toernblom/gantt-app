@@ -1,5 +1,5 @@
 import type { GanttNode, GanttRow, ZoomLevel, ZoomConfig } from '$lib/types';
-import { ZOOM_CONFIGS } from '$lib/types';
+import { ZOOM_CONFIGS, TASK_LIST_WIDTH } from '$lib/types';
 import { projectStore } from '../project/index.js';
 import { persistenceStore } from '../persistence/index.js';
 import { historyStore } from '../history/index.js';
@@ -53,6 +53,9 @@ class GanttStore {
    * touch this — direct clicks on the chart should not scroll the view.
    */
   scrollRequest = $state<{ id: string; nonce: number } | null>(null);
+  /** Scroll position + viewport size — updated by gantt-chart on scroll/resize. */
+  viewportScrollLeft = $state(0);
+  viewportClientWidth = $state(0);
 
   // --- Derived: navigation ---
   focusedNode = $derived<GanttNode | null>(

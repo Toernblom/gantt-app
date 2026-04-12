@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.25
+
+- New CLI tool for querying and mutating `project.json` from the terminal — designed for LLM agents but works for humans too
+- Commands: `list`, `show`, `up-next`, `add task`, `update`, `delete`, `add-todo`, `toggle-todo`, `remove-todo`, `move-todo`, `add-dep`, `remove-dep`
+- Task references accept name (fuzzy substring match) or ID prefix — LLMs don't need to carry full IDs
+- Auto-discovers project by walking up from CWD for `.ganttapp` marker; `--project <path>` overrides
+- Atomic writes (temp + rename) and auto-regenerates `project_llm.json` after every mutation
+- Bundled with the Tauri release via esbuild — auto-updates alongside the app
+- Dev usage: `npm run gantt -- <command>` or `ganttapp <command>` after `npm link`
+- Creating tasks in overview zoom mode now auto-places them at the viewport center with a 7-day duration and hides the date pickers
+
 ## 0.1.24
 
 - Fixed file watcher missing external edits to `project.json` on Windows when an LLM/editor saved atomically (temp-file + rename) — the view now refreshes automatically instead of requiring F5
