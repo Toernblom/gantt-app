@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.26
+
+- Fixed file watcher not detecting CLI/LLM edits — atomic writes (temp + rename) produced `rename` events that the watcher was filtering out
+- Widened event filter to accept all event types except `access` and `remove`
+- Reduced write guard from 2000ms to 500ms so external changes aren't blocked as long after app saves
+
 ## 0.1.25
 
 - New CLI tool for querying and mutating `project.json` from the terminal — designed for LLM agents but works for humans too

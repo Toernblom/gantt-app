@@ -381,7 +381,7 @@ function resolveTodo(project: Project, ref: string): { task: GanttNode; todo: To
 // Output formatting
 // ---------------------------------------------------------------------------
 
-function printTree(nodes: GanttNode[], indent = ''): void {
+function printTree(nodes: GanttNode[], indent = '', showDates = false): void {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     const isLast = i === nodes.length - 1;
@@ -389,11 +389,12 @@ function printTree(nodes: GanttNode[], indent = ''): void {
     const prog = effectiveProgress(node);
     const marker = node.isMilestone ? ' ◆' : '';
     const pct = prog > 0 ? ` [${prog}%]` : '';
-    console.log(`${indent}${branch}${node.name}${marker}${pct}  (${node.startDate} → ${node.endDate})`);
+    const dates = showDates ? `  (${node.startDate} → ${node.endDate})` : '';
+    console.log(`${indent}${branch}${node.name}${marker}${pct}${dates}`);
 
     if (node.children.length > 0) {
       const childIndent = indent + (indent ? (isLast ? '   ' : '│  ') : '  ');
-      printTree(node.children, childIndent);
+      printTree(node.children, childIndent, showDates);
     }
   }
 }
@@ -494,10 +495,10 @@ function die(msg: string): never {
 // Commands
 // ---------------------------------------------------------------------------
 
-function cmdList(project: Project): void {
+function cmdList(project: Project, showDates: boolean): void {
   if (project.children.length === 0) { console.log('(no tasks)'); return; }
   console.log(`Project: ${project.name}\n`);
-  printTree(project.children);
+  printTree(project.children, '', showDates);
 }
 
 function cmdShow(project: Project, ref: string): void {
@@ -687,7 +688,7 @@ Gantt App CLI
 Usage: gantt <command> [args] [--flags]
 
 Read commands:
-  list                              Show task tree
+  list [--dates]                     Show task tree
   show <task>                       Show task details
   up-next                           Show priority-sorted ready tasks
 
@@ -751,7 +752,7 @@ function main(): void {
 
   switch (command) {
     case 'list':
-      cmdList(project);
+      cmdList(project, flags.dates === true);
       break;
 
     case 'show':

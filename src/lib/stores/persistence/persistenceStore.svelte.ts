@@ -47,7 +47,7 @@ class PersistenceStore {
   private _saveTimer: ReturnType<typeof setTimeout> | null = null;
   private _unwatchFn: (() => Promise<void>) | null = null;
   private _lastWriteTime = 0;
-  private static readonly WRITE_GUARD_MS = 2000;
+  private static readonly WRITE_GUARD_MS = 500;
 
   scheduleSave(project: Project): void {
     if (isTauri) {
@@ -273,20 +273,16 @@ class PersistenceStore {
       );
       if (!touchesProjectFile) return;
 
-      // Filter by event kind. Tauri's WatchEvent.type is either a string
-      // ('any' | 'other') or an object like { modify: {...} }, { create: {...} },
-      // { access: {...} }, { remove: {...} }. Accept modify + create + any
-      // (catch-all); skip access (reads only), remove (nothing to reload),
-      // and 'other' (unknown).
+      // Filter by event kind. Only skip events that are definitely not
+      // file-content changes: 'access' (reads) and 'remove' (deletions).
+      // Accept everything else — modify, create, rename, any, other —
+      // because atomic writers (CLI, LLM agents) produce rename events
+      // that were previously dropped, breaking external-change detection.
       const type = event.type;
-      let interesting = false;
-      if (typeof type === 'string') {
-        interesting = type === 'any';
-      } else if (type && typeof type === 'object') {
+      if (typeof type === 'object' && type !== null) {
         const kind = Object.keys(type)[0];
-        interesting = kind === 'modify' || kind === 'create';
+        if (kind === 'access' || kind === 'remove') return;
       }
-      if (!interesting) return;
 
       // Skip if we have a pending or in-progress save — this is our own write
       if (this._saveTimer || this.isSaving) return;

@@ -283,7 +283,7 @@ function resolveTodo(project, ref) {
   if (matches.length > 1) die(`Ambiguous todo "${ref}" \u2014 matches ${matches.length} todos: ${matches.map((m) => m.todo.text).join(", ")}`);
   die(`No todo found matching "${ref}"`);
 }
-function printTree(nodes, indent = "") {
+function printTree(nodes, indent = "", showDates = false) {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     const isLast = i === nodes.length - 1;
@@ -291,10 +291,11 @@ function printTree(nodes, indent = "") {
     const prog = effectiveProgress(node);
     const marker = node.isMilestone ? " \u25C6" : "";
     const pct = prog > 0 ? ` [${prog}%]` : "";
-    console.log(`${indent}${branch}${node.name}${marker}${pct}  (${node.startDate} \u2192 ${node.endDate})`);
+    const dates = showDates ? `  (${node.startDate} \u2192 ${node.endDate})` : "";
+    console.log(`${indent}${branch}${node.name}${marker}${pct}${dates}`);
     if (node.children.length > 0) {
       const childIndent = indent + (indent ? isLast ? "   " : "\u2502  " : "  ");
-      printTree(node.children, childIndent);
+      printTree(node.children, childIndent, showDates);
     }
   }
 }
@@ -376,14 +377,14 @@ function die(msg) {
   console.error(`Error: ${msg}`);
   process.exit(1);
 }
-function cmdList(project) {
+function cmdList(project, showDates) {
   if (project.children.length === 0) {
     console.log("(no tasks)");
     return;
   }
   console.log(`Project: ${project.name}
 `);
-  printTree(project.children);
+  printTree(project.children, "", showDates);
 }
 function cmdShow(project, ref) {
   const node = resolveTask(project, ref);
@@ -527,7 +528,7 @@ Gantt App CLI
 Usage: gantt <command> [args] [--flags]
 
 Read commands:
-  list                              Show task tree
+  list [--dates]                     Show task tree
   show <task>                       Show task details
   up-next                           Show priority-sorted ready tasks
 
@@ -583,7 +584,7 @@ function main() {
   const project = readProject(dir);
   switch (command) {
     case "list":
-      cmdList(project);
+      cmdList(project, flags.dates === true);
       break;
     case "show":
       if (!positional[0]) die("Usage: gantt show <task>");
