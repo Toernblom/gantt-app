@@ -56,10 +56,18 @@
 	// -------------------------------------------------------------------------
 
 	function handleWheel(e: WheelEvent) {
-		if (!e.ctrlKey && !e.metaKey) return;
+		if (e.ctrlKey || e.metaKey) {
+			e.preventDefault();
+			const delta = e.deltaY > 0 ? -0.1 : 0.1;
+			ganttStore.setUiScale(ganttStore.uiScale + delta);
+			return;
+		}
+		// Manual scroll: prevents touchpad axis-locking where starting
+		// a horizontal scroll blocks vertical scrolling until momentum ends.
+		if (!scrollEl) return;
 		e.preventDefault();
-		const delta = e.deltaY > 0 ? -0.1 : 0.1;
-		ganttStore.setUiScale(ganttStore.uiScale + delta);
+		scrollEl.scrollLeft += e.deltaX;
+		scrollEl.scrollTop += e.deltaY;
 	}
 
 	// -------------------------------------------------------------------------
@@ -102,6 +110,19 @@
 	}
 
 	// -------------------------------------------------------------------------
+	// Non-passive wheel listener (must use addEventListener, not onwheel)
+	// Browsers default wheel listeners to passive, silently ignoring
+	// preventDefault(). Without this, the browser's native scroll runs
+	// alongside our manual scroll, causing touchpad axis-locking.
+	// -------------------------------------------------------------------------
+
+	$effect(() => {
+		if (!scrollEl) return;
+		scrollEl.addEventListener('wheel', handleWheel, { passive: false });
+		return () => scrollEl!.removeEventListener('wheel', handleWheel);
+	});
+
+	// -------------------------------------------------------------------------
 	// Viewport sync (scroll position + client width)
 	// -------------------------------------------------------------------------
 
@@ -142,7 +163,6 @@
 		class:cursor-grabbing={isPanning}
 		tabindex="0"
 		onkeydown={(e) => ganttStore.handleKeyDown(e)}
-		onwheel={handleWheel}
 		onmousedown={handlePanStart}
 		oncontextmenu={handleContextMenu}
 		onscroll={syncViewport}

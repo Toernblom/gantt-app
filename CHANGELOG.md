@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.27
+
+- Fixed touchpad scrolling axis-lock — switching between horizontal and vertical scroll now responds instantly instead of getting stuck
+- Root cause: browser defaults wheel listeners to passive, silently ignoring preventDefault(); now using non-passive addEventListener so manual scroll handling fully overrides native behavior
+
 ## 0.1.26
 
 - Fixed file watcher not detecting CLI/LLM edits — atomic writes (temp + rename) produced `rename` events that the watcher was filtering out
